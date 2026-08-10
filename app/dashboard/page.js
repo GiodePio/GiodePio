@@ -1,131 +1,78 @@
 const colors = {
-  bg: "#000000",
-  panel: "#111214",
-  border: "#232427",
-  text: "#ffffff",
-  textDim: "#9a9a9f",
+  bg: "#12161c",
+  card: "#1a2129",
+  border: "#28313b",
+  text: "#eef1f4",
+  textDim: "#9aa5b1",
+  primary: "#5fb87a",
 };
-
-function StatCard({ icon, label, value, sub }) {
-  return (
-    <div
-      style={{
-        background: colors.panel,
-        borderRadius: 10,
-        padding: 16,
-        flex: 1,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 6, color: colors.textDim, fontSize: 12, marginBottom: 10 }}>
-        <span>{icon}</span> HELLO
-      </div>
-      <div style={{ fontSize: 26, fontWeight: 600 }}>{value}</div>
-      <div style={{ fontSize: 12, color: colors.textDim, marginTop: 4 }}>HELLO</div>
-    </div>
-  );
-}
-
-function NavItem({ icon, label, active }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "8px 12px",
-        borderRadius: 8,
-        background: active ? "#1b1c1f" : "transparent",
-        color: active ? colors.text : colors.textDim,
-        fontSize: 14,
-        marginBottom: 2,
-      }}
-    >
-      <span>{icon}</span>
-      <span>{label}</span>
-    </div>
-  );
-}
 
 export default function DashboardPage() {
   return (
-    <div style={{ display: "flex", minHeight: "100vh", color: colors.text }}>
-      {/* Sidebar */}
-      <aside
+    <div style={{ minHeight: "100vh", background: colors.bg, color: colors.text, fontFamily: "sans-serif" }}>
+      <header
         style={{
-          width: 200,
-          borderRight: `1px solid ${colors.border}`,
-          padding: 16,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "18px 32px",
+          borderBottom: `1px solid ${colors.border}`,
         }}
       >
-        <div style={{ height: 28, marginBottom: 24 }} />
-        <NavItem icon="📊" label="HELLO" active />
-        <NavItem icon="📈" label="HELLO" />
-        <NavItem icon="🔧" label="HELLO" />
-        <NavItem icon="📋" label="Plans" />
-        <NavItem icon="⭐" label="+Rep" />
-        <NavItem icon="📡" label="HELLO" />
-      </aside>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 700 }}>
+          <div style={{ width: 22, height: 22, borderRadius: 5, background: colors.primary }} />
+          BlockLens
+        </div>
+        <span style={{ fontSize: 14, color: colors.textDim }}>HELLO</span>
+      </header>
 
-      {/* Main content */}
-      <main style={{ flex: 1, padding: 32 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 600, margin: 0 }}>Good evening, bnn.</h1>
-        <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4, marginBottom: 24 }}>
-          Your workspace is ready.
+      <main style={{ maxWidth: 640, margin: "0 auto", padding: "64px 24px" }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>Look up a profile</h1>
+        <p style={{ color: colors.textDim, fontSize: 14, marginTop: 6, marginBottom: 28 }}>
+          Search any Minecraft username to see their UUID, skin, and cape.
         </p>
 
-        {/* Stat cards */}
-        <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
-          <StatCard icon="👥" value="0" />
-          <StatCard icon="💬" value="0" />
-          <StatCard icon="🌐" value="0" />
-          <div
+        <div style={{ display: "flex", gap: 10 }}>
+          <input
+            placeholder="Notch"
             style={{
-              background: colors.panel,
-              borderRadius: 10,
-              padding: 16,
               flex: 1,
+              background: "transparent",
+              border: `1px solid ${colors.border}`,
+              borderRadius: 8,
+              padding: "10px 14px",
+              color: colors.text,
+              fontSize: 14,
+            }}
+          />
+          <button
+            style={{
+              background: colors.primary,
+              color: "#0a1a0e",
+              border: "none",
+              borderRadius: 8,
+              padding: "10px 20px",
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: "pointer",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 6, color: colors.textDim, fontSize: 12, marginBottom: 10 }}>
-              <span>🔵</span> HELLO
-            </div>
-            <div style={{ display: "flex", gap: 16, fontSize: 14 }}>
-              <span>💻 0</span>
-              <span>⏳ 0</span>
-            </div>
-          </div>
+            Search
+          </button>
         </div>
 
-        {/* Lower section */}
-        <div style={{ display: "flex", gap: 16 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 500 }}>HELLO</span>
-              <span style={{ fontSize: 13, color: colors.textDim }}>View all →</span>
-            </div>
-            <div
-              style={{
-                height: 260,
-                background: colors.panel,
-                borderRadius: 10,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                color: colors.textDim,
-              }}
-            >
-              <div style={{ fontSize: 28, marginBottom: 8 }}>✉️</div>
-              <div style={{ fontSize: 13 }}>HELLO</div>
-            </div>
-          </div>
-
-          <div style={{ width: 260, background: colors.panel, borderRadius: 10, padding: 16 }}>
-            <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, marginBottom: 8 }}>
-              TOP SERVERS
-            </div>
-            <div style={{ fontSize: 13, color: colors.textDim }}>No servers yet</div>
-          </div>
+        <div
+          style={{
+            marginTop: 64,
+            border: `1px dashed ${colors.border}`,
+            borderRadius: 12,
+            padding: "48px 0",
+            textAlign: "center",
+            color: colors.textDim,
+            fontSize: 14,
+          }}
+        >
+          HELLO
         </div>
       </main>
     </div>
