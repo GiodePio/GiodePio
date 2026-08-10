@@ -28,15 +28,18 @@ export async function GET(request) {
       }
     );
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      const res = NextResponse.redirect(new URL(next, SITE_URL));
-      cookiesToSet.forEach(({ name, value, options }) => {
-        res.cookies.set(name, value, options);
-      });
-      return res;
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error) {
+      return NextResponse.redirect(new URL(`/auth/error?message=${encodeURIComponent(error.message)}`, SITE_URL));
     }
+
+    const res = NextResponse.redirect(new URL(next, SITE_URL));
+    cookiesToSet.forEach(({ name, value, options }) => {
+      res.cookies.set(name, value, options);
+    });
+    return res;
   }
 
-  return NextResponse.redirect(new URL('/auth/error', SITE_URL));
+  return NextResponse.redirect(new URL('/auth/error?message=No+code+provided', SITE_URL));
 }
