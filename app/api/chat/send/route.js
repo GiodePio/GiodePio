@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { store } from '../../../../lib/store';
 
 export async function POST(request) {

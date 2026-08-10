@@ -1,6 +1,8 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { requirePermission } from '@/lib/auth';
+import { requirePermission } from '../../../../lib/auth.js';
 
 export async function GET(request) {
   const auth = await requirePermission(request, 'users.view');

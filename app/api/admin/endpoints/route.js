@@ -1,6 +1,8 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { requirePermission, logAuditEvent } from '@/lib/auth';
+import { requirePermission, logAuditEvent } from '../../../../lib/auth.js';
 import crypto from 'crypto';
 
 export async function GET(request) {
