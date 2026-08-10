@@ -3,12 +3,16 @@ export const dynamic = 'force-dynamic';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.modrinth.nl';
+
 export async function GET(request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const next = searchParams.get('next') ?? '/dashboard';
 
   if (code) {
+    let cookiesToSet = [];
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -17,11 +21,8 @@ export async function GET(request) {
           getAll() {
             return request.cookies.getAll();
           },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-            const response = NextResponse.redirect(new URL(next, origin));
-            cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
-            return response;
+          setAll(cookies) {
+            cookiesToSet = cookies;
           },
         },
       }
@@ -29,9 +30,13 @@ export async function GET(request) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(new URL(next, origin));
+      const res = NextResponse.redirect(new URL(next, SITE_URL));
+      cookiesToSet.forEach(({ name, value, options }) => {
+        res.cookies.set(name, value, options);
+      });
+      return res;
     }
   }
 
-  return NextResponse.redirect(new URL('/auth/error', origin));
+  return NextResponse.redirect(new URL('/auth/error', SITE_URL));
 }

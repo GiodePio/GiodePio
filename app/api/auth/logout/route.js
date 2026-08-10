@@ -21,5 +21,6 @@ export async function GET(request) {
 
   await supabase.auth.signOut();
 
-  return NextResponse.redirect(new URL('/', request.url));
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.modrinth.nl';
+  return NextResponse.redirect(new URL('/', SITE_URL));
 }
