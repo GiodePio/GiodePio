@@ -48,7 +48,6 @@ function Dashboard() {
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase' }}>Recent Captures</span>
-            <span style={{ fontSize: 12, color: colors.textDim, cursor: 'pointer' }}>View all →</span>
           </div>
           <div style={{ height: 160, background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
             <span style={{ fontSize: 28, marginBottom: 8 }}>🔒</span>
@@ -121,21 +120,11 @@ function Plans() {
     <div style={{ flex: 1, padding: '28px 36px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0' }}>Plans</h1>
       <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Upgrade to unlock more features.</p>
-      <div style={{ display: 'flex', gap: 16, maxWidth: 700 }}>
-        <div style={{ flex: 1, background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 28 }}>
-          <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, marginBottom: 6 }}>FREE</div>
-          <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$0</div>
-          <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 20 }}>/ forever</div>
-          {['5 grabs per day', 'Basic profile lookup', 'Discord webhook'].map((f, i) => (
-            <div key={i} style={{ fontSize: 13, color: colors.text, marginBottom: 8, display: 'flex', gap: 8 }}>
-              <span style={{ color: colors.green }}>✓</span> {f}
-            </div>
-          ))}
-        </div>
-        <div style={{ flex: 1, background: colors.panel, border: `1px solid ${colors.green}`, borderRadius: 12, padding: 28, position: 'relative' }}>
+      <div style={{ maxWidth: 400 }}>
+        <div style={{ background: colors.panel, border: `1px solid ${colors.green}`, borderRadius: 12, padding: 28, position: 'relative' }}>
           <div style={{ position: 'absolute', top: -10, left: 20, background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 8 }}>PRO</div>
           <div style={{ fontSize: 12, color: colors.green, letterSpacing: 1, marginBottom: 6, fontWeight: 600 }}>👑 ULTIMATE GRABS</div>
-          <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$9.99</div>
+          <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$5</div>
           <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 20 }}>/ month</div>
           {['Unlimited sessions', 'Permanent data retention', 'Webhook notifications', 'Auth Mods & Builds', 'Priority support'].map((f, i) => (
             <div key={i} style={{ fontSize: 13, color: colors.text, marginBottom: 8, display: 'flex', gap: 8 }}>
@@ -149,38 +138,114 @@ function Plans() {
   );
 }
 
-function RepPage() {
-  const reviews = [
-    { user: 'tp67676767', tag: 'Good', time: 'Posted yesterday', text: 'work perfect' },
-    { user: 'shxzlol_1', tag: 'Good', time: 'Posted yesterday', text: 'Really good' },
-  ];
+function RepPage({ username }) {
+  const [reviews, setReviews] = useState([]);
+  const [newRep, setNewRep] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState('');
+  const [menuOpen, setMenuOpen] = useState(null);
+  const [filter, setFilter] = useState('Newest');
+
+  const handlePost = () => {
+    if (!newRep.trim() || !username) return;
+    setReviews([{ id: Date.now(), user: username, tag: 'Good', time: 'Just now', text: newRep.trim() }, ...reviews]);
+    setNewRep('');
+  };
+
+  const handleDelete = (id) => {
+    setReviews(reviews.filter(r => r.id !== id));
+    setMenuOpen(null);
+  };
+
+  const handleEdit = (id) => {
+    const r = reviews.find(r => r.id === id);
+    setEditingId(id);
+    setEditText(r.text);
+    setMenuOpen(null);
+  };
+
+  const handleSaveEdit = (id) => {
+    setReviews(reviews.map(r => r.id === id ? { ...r, text: editText, time: 'Edited just now' } : r));
+    setEditingId(null);
+    setEditText('');
+  };
+
+  const filtered = filter === 'Good' ? reviews.filter(r => r.tag === 'Good') :
+    filter === 'Bad' ? reviews.filter(r => r.tag === 'Bad') :
+    filter === 'Mine' ? reviews.filter(r => r.user === username) :
+    filter === 'Oldest' ? [...reviews].reverse() :
+    reviews;
+
   return (
     <div style={{ flex: 1, padding: '28px 36px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 4px 0' }}>+Rep</h1>
-          <p style={{ color: colors.textDim, fontSize: 14, margin: 0 }}>5 reviews from users.</p>
+          <p style={{ color: colors.textDim, fontSize: 14, margin: 0 }}>{reviews.length} reviews from users.</p>
         </div>
         <button style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.text, padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
           <span>✏️</span> Edit your +Rep
         </button>
       </div>
+
+      {username ? (
+        <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
+          <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 8 }}>Add your rep</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={newRep}
+              onChange={e => setNewRep(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handlePost()}
+              placeholder="Write a review..."
+              style={{ flex: 1, background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none' }}
+            />
+            <button onClick={handlePost} style={{ background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Confirm</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 20, textAlign: 'center', color: colors.textDim, fontSize: 13 }}>
+          Sign in to leave a review
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {['Newest', 'Oldest', 'Good', 'Bad', 'Mine'].map((f, i) => (
-          <button key={i} style={{ background: i === 0 ? colors.text : 'transparent', color: i === 0 ? colors.bg : colors.textDim, border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>{f}</button>
+        {['Newest', 'Oldest', 'Good', 'Bad', 'Mine'].map((f) => (
+          <button key={f} onClick={() => setFilter(f)} style={{ background: filter === f ? colors.text : 'transparent', color: filter === f ? colors.bg : colors.textDim, border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>{f}</button>
         ))}
       </div>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {reviews.map((r, i) => (
-          <div key={i} style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 10, padding: '16px 20px' }}>
+        {filtered.map((r) => (
+          <div key={r.id} style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 10, padding: '16px 20px', position: 'relative' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{r.user}</span>
               <span style={{ background: '#1a2a1a', color: colors.green, fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>👍 {r.tag}</span>
               <span style={{ fontSize: 12, color: colors.textDim, marginLeft: 'auto' }}>{r.time}</span>
+              {r.user === username && (
+                <div style={{ position: 'relative' }}>
+                  <span onClick={() => setMenuOpen(menuOpen === r.id ? null : r.id)} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 16, padding: '0 4px' }}>⋯</span>
+                  {menuOpen === r.id && (
+                    <div style={{ position: 'absolute', top: '100%', right: 0, background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 8, padding: 6, zIndex: 10, minWidth: 100 }}>
+                      <div onClick={() => handleEdit(r.id)} style={{ padding: '8px 12px', fontSize: 13, color: colors.text, cursor: 'pointer', borderRadius: 4 }}>Edit</div>
+                      <div onClick={() => handleDelete(r.id)} style={{ padding: '8px 12px', fontSize: 13, color: '#ef4444', cursor: 'pointer', borderRadius: 4 }}>Delete</div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <p style={{ fontSize: 14, color: colors.text, margin: 0 }}>{r.text}</p>
+            {editingId === r.id ? (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSaveEdit(r.id)} style={{ flex: 1, background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 6, padding: '8px 12px', color: colors.text, fontSize: 14, outline: 'none' }} />
+                <button onClick={() => handleSaveEdit(r.id)} style={{ background: colors.green, color: '#000', border: 'none', borderRadius: 6, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Save</button>
+              </div>
+            ) : (
+              <p style={{ fontSize: 14, color: colors.text, margin: 0 }}>{r.text}</p>
+            )}
           </div>
         ))}
+        {filtered.length === 0 && (
+          <div style={{ textAlign: 'center', color: colors.textDim, fontSize: 13, padding: 40 }}>No reviews yet</div>
+        )}
       </div>
     </div>
   );
@@ -201,6 +266,7 @@ function LiveCaptures() {
 
 export default function DashboardPage() {
   const [page, setPage] = useState('dashboard');
+  const username = 'You';
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <aside style={{ width: 200, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column' }}>
@@ -225,7 +291,7 @@ export default function DashboardPage() {
       {page === 'grabs' && <Grabs />}
       {page === 'build' && <Build />}
       {page === 'plans' && <Plans />}
-      {page === 'rep' && <RepPage />}
+      {page === 'rep' && <RepPage username={username} />}
       {page === 'live' && <LiveCaptures />}
     </div>
   );
