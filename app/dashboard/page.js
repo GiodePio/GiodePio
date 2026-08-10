@@ -145,10 +145,11 @@ function RepPage({ username }) {
   const [editText, setEditText] = useState('');
   const [menuOpen, setMenuOpen] = useState(null);
   const [filter, setFilter] = useState('Newest');
+  const [newTag, setNewTag] = useState('Good');
 
   const handlePost = () => {
     if (!newRep.trim() || !username) return;
-    setReviews([{ id: Date.now(), user: username, tag: 'Good', time: 'Just now', text: newRep.trim() }, ...reviews]);
+    setReviews([{ id: Date.now(), user: username, tag: newTag, time: 'Just now', text: newRep.trim() }, ...reviews]);
     setNewRep('');
   };
 
@@ -186,6 +187,10 @@ function RepPage({ username }) {
       {username ? (
         <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
           <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 8 }}>Add your rep</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <button onClick={() => setNewTag('Good')} style={{ background: newTag === 'Good' ? colors.green : 'transparent', color: newTag === 'Good' ? '#000' : colors.textDim, border: `1px solid ${newTag === 'Good' ? colors.green : colors.border}`, borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>👍 Good</button>
+            <button onClick={() => setNewTag('Bad')} style={{ background: newTag === 'Bad' ? '#ef4444' : 'transparent', color: newTag === 'Bad' ? '#fff' : colors.textDim, border: `1px solid ${newTag === 'Bad' ? '#ef4444' : colors.border}`, borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>👎 Bad</button>
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               value={newRep}
