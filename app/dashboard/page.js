@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 const colors = {
   bg: '#0a0a0f',
@@ -138,7 +138,7 @@ function Plans() {
   );
 }
 
-function RepPage({ username }) {
+function RepPage({ username, userEmail }) {
   const [reviews, setReviews] = useState([]);
   const [newRep, setNewRep] = useState('');
   const [editingId, setEditingId] = useState(null);
@@ -146,16 +146,36 @@ function RepPage({ username }) {
   const [menuOpen, setMenuOpen] = useState(null);
   const [filter, setFilter] = useState('Newest');
   const [newTag, setNewTag] = useState('Good');
+  const [loading, setLoading] = useState(true);
 
-  const handlePost = () => {
-    if (!newRep.trim() || !username) return;
-    setReviews([{ id: Date.now(), user: username, tag: newTag, time: 'Just now', text: newRep.trim() }, ...reviews]);
-    setNewRep('');
+  const fetchReps = useCallback(async () => {
+    try {
+      const res = await fetch('/api/reps');
+      const data = await res.json();
+      setReviews(data.reps || []);
+    } catch {}
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchReps(); }, [fetchReps]);
+
+  const handlePost = async () => {
+    if (!newRep.trim() || !userEmail || !username) return;
+    const res = await fetch('/api/reps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_email: userEmail, username, tag: newTag, text: newRep.trim() }),
+    });
+    if (res.ok) {
+      setNewRep('');
+      fetchReps();
+    }
   };
 
-  const handleDelete = (id) => {
-    setReviews(reviews.filter(r => r.id !== id));
+  const handleDelete = async (id) => {
+    await fetch(`/api/reps/${id}?user_email=${encodeURIComponent(userEmail)}`, { method: 'DELETE' });
     setMenuOpen(null);
+    fetchReps();
   };
 
   const handleEdit = (id) => {
@@ -165,17 +185,35 @@ function RepPage({ username }) {
     setMenuOpen(null);
   };
 
-  const handleSaveEdit = (id) => {
-    setReviews(reviews.map(r => r.id === id ? { ...r, text: editText, time: 'Edited just now' } : r));
+  const handleSaveEdit = async (id) => {
+    await fetch(`/api/reps/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: editText, user_email: userEmail }),
+    });
     setEditingId(null);
     setEditText('');
+    fetchReps();
   };
+
+  const myRep = reviews.find(r => r.user_email === userEmail);
 
   const filtered = filter === 'Good' ? reviews.filter(r => r.tag === 'Good') :
     filter === 'Bad' ? reviews.filter(r => r.tag === 'Bad') :
-    filter === 'Mine' ? reviews.filter(r => r.user === username) :
+    filter === 'Mine' ? reviews.filter(r => r.user_email === userEmail) :
     filter === 'Oldest' ? [...reviews].reverse() :
     reviews;
+
+  const formatTime = (t) => {
+    if (!t) return '';
+    const d = new Date(t);
+    const now = new Date();
+    const diff = Math.floor((now - d) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return d.toLocaleDateString();
+  };
 
   return (
     <div style={{ flex: 1, padding: '28px 36px' }}>
@@ -184,8 +222,8 @@ function RepPage({ username }) {
         <p style={{ color: colors.textDim, fontSize: 14, margin: 0 }}>{reviews.length} reviews from users.</p>
       </div>
 
-      {username ? (
-        reviews.find(r => r.user === username) ? (
+      {userEmail ? (
+        myRep ? (
           <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
             <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 8 }}>You already posted a rep</div>
             <p style={{ fontSize: 13, color: colors.textDim, margin: 0 }}>You can edit or delete your existing rep below.</p>
@@ -225,10 +263,10 @@ function RepPage({ username }) {
         {filtered.map((r) => (
           <div key={r.id} style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 10, padding: '16px 20px', position: 'relative' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{r.user}</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{r.username}</span>
               <span style={{ background: '#1a2a1a', color: colors.green, fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>👍 {r.tag}</span>
-              <span style={{ fontSize: 12, color: colors.textDim, marginLeft: 'auto' }}>{r.time}</span>
-              {r.user === username && (
+              <span style={{ fontSize: 12, color: colors.textDim, marginLeft: 'auto' }}>{formatTime(r.created_at)}</span>
+              {r.user_email === userEmail && (
                 <div style={{ position: 'relative' }}>
                   <span onClick={() => setMenuOpen(menuOpen === r.id ? null : r.id)} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 16, padding: '0 4px' }}>⋯</span>
                   {menuOpen === r.id && (
@@ -250,7 +288,7 @@ function RepPage({ username }) {
             )}
           </div>
         ))}
-        {filtered.length === 0 && (
+        {filtered.length === 0 && !loading && (
           <div style={{ textAlign: 'center', color: colors.textDim, fontSize: 13, padding: 40 }}>No reviews yet</div>
         )}
       </div>
@@ -273,7 +311,18 @@ function LiveCaptures() {
 
 export default function DashboardPage() {
   const [page, setPage] = useState('dashboard');
-  const username = 'You';
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/auth/user')
+      .then(r => r.json())
+      .then(d => { if (d.user) setUser(d.user); })
+      .catch(() => {});
+  }, []);
+
+  const username = user?.name || 'You';
+  const userEmail = user?.email || '';
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <aside style={{ width: 200, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column' }}>
@@ -291,14 +340,14 @@ export default function DashboardPage() {
         </div>
         <div>
           <NavItem icon="⚙️" label="Settings" />
-          <NavItem icon="🚪" label="Log out" />
+          <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
         </div>
       </aside>
       {page === 'dashboard' && <Dashboard />}
       {page === 'grabs' && <Grabs />}
       {page === 'build' && <Build />}
       {page === 'plans' && <Plans />}
-      {page === 'rep' && <RepPage username={username} />}
+      {page === 'rep' && <RepPage username={username} userEmail={userEmail} />}
       {page === 'live' && <LiveCaptures />}
     </div>
   );
