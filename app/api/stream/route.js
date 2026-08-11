@@ -3,6 +3,10 @@ export const dynamic = 'force-dynamic';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
+const ADMIN_EMAILS = ['lifegrading@gmail.com', 'giodewaard152@gmail.com'];
+
+const memFrames = {};
+
 function getClientAuth(request) {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -40,18 +44,20 @@ export async function POST(request) {
       const buffer = await request.arrayBuffer();
       const base64 = Buffer.from(buffer).toString('base64');
       const frame = 'data:image/jpeg;base64,' + base64;
-      const timestamp = Date.now();
+      const now = new Date().toISOString();
 
-      const supabase = getClient();
-      const { error } = await supabase
-        .from('stream_frames')
-        .upsert(
-          { username, frame, updated_at: new Date().toISOString() },
-          { onConflict: 'username' }
-        );
+      memFrames[username] = { frame, timestamp: Date.now() };
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+      try {
+        const supabase = getClient();
+        await supabase
+          .from('stream_frames')
+          .upsert(
+            { username, frame, updated_at: now },
+            { onConflict: 'username' }
+          );
+      } catch (e) {
+        // Supabase failed, memory still has it
       }
 
       return NextResponse.json({ ok: true });
@@ -66,45 +72,70 @@ export async function POST(request) {
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const username = searchParams.get('username');
+  const now = Date.now();
 
-  const supabase = getClient();
+  let supabaseRows = [];
+  try {
+    const supabase = getClient();
+    const { data } = await supabase.from('stream_frames').select('username, updated_at');
+    supabaseRows = data || [];
+  } catch (e) {}
+
+  const allFrames = {};
+  for (const row of supabaseRows) {
+    allFrames[row.username] = new Date(row.updated_at).getTime();
+  }
+  for (const [name, data] of Object.entries(memFrames)) {
+    if (!allFrames[name] || data.timestamp > allFrames[name]) {
+      allFrames[name] = data.timestamp;
+    }
+  }
 
   if (username) {
     const supabaseAuth = getClientAuth(request);
     const { data: { user } } = await supabaseAuth.auth.getUser();
     if (!user) return NextResponse.json({ online: false });
 
-    const { data: grab } = await supabase
-      .from('grabs')
-      .select('id')
-      .eq('minecraft_username', username)
-      .eq('owner_email', user.email)
-      .limit(1)
-      .single();
+    const isAdmin = ADMIN_EMAILS.includes(user.email);
 
-    const isAdmin = user.email === 'lifegrading@gmail.com';
-    if (!grab && !isAdmin) return NextResponse.json({ online: false });
+    if (!isAdmin) {
+      const supabase = getClient();
+      const { data: grab } = await supabase
+        .from('grabs')
+        .select('id')
+        .eq('minecraft_username', username)
+        .eq('owner_email', user.email)
+        .limit(1)
+        .single();
+      if (!grab) return NextResponse.json({ online: false });
+    }
 
-    const { data: row } = await supabase
-      .from('stream_frames')
-      .select('frame, updated_at')
-      .eq('username', username)
-      .single();
-
-    if (!row || Date.now() - new Date(row.updated_at).getTime() > 10000) {
+    const ts = allFrames[username];
+    if (!ts || now - ts > 10000) {
       return NextResponse.json({ online: false });
     }
-    return NextResponse.json({ online: true, frame: row.frame, timestamp: new Date(row.updated_at).getTime() });
+
+    let frame = null;
+    if (memFrames[username] && memFrames[username].timestamp === ts) {
+      frame = memFrames[username].frame;
+    } else {
+      try {
+        const supabase = getClient();
+        const { data: row } = await supabase
+          .from('stream_frames')
+          .select('frame')
+          .eq('username', username)
+          .single();
+        frame = row?.frame || null;
+      } catch (e) {}
+    }
+
+    return NextResponse.json({ online: true, frame, timestamp: ts });
   }
 
-  const { data: allFrames } = await supabase
-    .from('stream_frames')
-    .select('username, updated_at');
-
-  const now = Date.now();
-  const online = (allFrames || [])
-    .filter(f => now - new Date(f.updated_at).getTime() < 10000)
-    .map(f => ({ username: f.username, timestamp: new Date(f.updated_at).getTime() }));
+  const online = Object.entries(allFrames)
+    .filter(([, ts]) => now - ts < 10000)
+    .map(([name, ts]) => ({ username: name, timestamp: ts }));
 
   if (online.length === 0) {
     return NextResponse.json({ online: [] });
@@ -112,7 +143,7 @@ export async function GET(request) {
 
   const supabaseAuth = getClientAuth(request);
   const { data: { user } } = await supabaseAuth.auth.getUser();
-  const isAdmin = user?.email === 'lifegrading@gmail.com';
+  const isAdmin = ADMIN_EMAILS.includes(user?.email);
 
   if (isAdmin) {
     return NextResponse.json({ online });
@@ -122,6 +153,7 @@ export async function GET(request) {
     return NextResponse.json({ online: [] });
   }
 
+  const supabase = getClient();
   const ownerEmails = {};
   for (const u of online) {
     if (!ownerEmails[u.username]) {
