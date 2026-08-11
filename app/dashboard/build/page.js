@@ -26,13 +26,13 @@ function NavItem({ icon, label, active, onClick }) {
 }
 
 const BUILD_STEPS = [
-  'Queuing runner...',
-  'Setting environment...',
-  'Compiling jar...',
-  'Compiled complete',
-  'Uploading to storage...',
-  'Finalizing...',
-  'Build complete',
+  { label: 'Queuing runner...', duration: 600 },
+  { label: 'Setting environment...', duration: 800 },
+  { label: 'Compiling jar...', duration: 0 },
+  { label: 'Compiled complete', duration: 400 },
+  { label: 'Uploading to storage...', duration: 600 },
+  { label: 'Finalizing...', duration: 500 },
+  { label: 'Build complete', duration: 0 },
 ];
 
 export default function BuildPage() {
@@ -41,7 +41,7 @@ export default function BuildPage() {
   const [userEmail, setUserEmail] = useState('');
   const [emailConfirmed, setEmailConfirmed] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [buildStep, setBuildStep] = useState(0);
+  const [buildStep, setBuildStep] = useState(-1);
   const [buildDone, setBuildDone] = useState(false);
 
   useEffect(() => {
@@ -61,13 +61,26 @@ export default function BuildPage() {
     setBuildStep(0);
     setBuildDone(false);
 
-    for (let i = 0; i < BUILD_STEPS.length; i++) {
-      setBuildStep(i);
-      await new Promise(r => setTimeout(r, i === 0 ? 800 : i === 1 ? 1200 : i === 2 ? 2000 : i === 3 ? 600 : i === 4 ? 1500 : i === 5 ? 800 : 400));
-    }
+    let stepIndex = 0;
+    const apiPromise = fetch(`/api/download?email=${encodeURIComponent(email)}`);
+
+    const runSteps = async () => {
+      for (let i = 0; i < BUILD_STEPS.length; i++) {
+        stepIndex = i;
+        setBuildStep(i);
+        if (i === 2) {
+          await apiPromise;
+        }
+        if (BUILD_STEPS[i].duration > 0) {
+          await new Promise(r => setTimeout(r, BUILD_STEPS[i].duration));
+        }
+      }
+    };
+
+    await runSteps();
 
     try {
-      const res = await fetch(`/api/download?email=${encodeURIComponent(email)}`);
+      const res = await apiPromise;
       if (res.ok) {
         const disposition = res.headers.get('content-disposition');
         const fileName = disposition ? disposition.split('filename=')[1]?.replace(/"/g, '') : 'consentmod.jar';
@@ -84,7 +97,7 @@ export default function BuildPage() {
     } catch (e) {}
 
     setBuildDone(true);
-    setTimeout(() => { setDownloading(false); setBuildDone(false); setBuildStep(0); }, 2000);
+    setTimeout(() => { setDownloading(false); setBuildDone(false); setBuildStep(-1); }, 2000);
   };
 
   return (
@@ -200,7 +213,7 @@ export default function BuildPage() {
                       {isDone ? '✓' : isCurrent ? <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> : i + 1}
                     </div>
                     <span style={{ fontSize: 13, color: isDone ? colors.green : isCurrent ? colors.text : '#555', fontWeight: isCurrent ? 600 : 400 }}>
-                      {step}
+                      {step.label}
                     </span>
                   </div>
                 );
