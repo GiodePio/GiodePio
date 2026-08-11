@@ -32,9 +32,17 @@ export default function GrabsPage() {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    fetch('/api/grabs')
+    fetch('/api/auth/user')
       .then(r => r.json())
-      .then(d => { setGrabs(d.grabs || []); setLoading(false); })
+      .then(d => {
+        if (d.user?.email) {
+          return fetch(`/api/grabs?owner_email=${encodeURIComponent(d.user.email)}`);
+        }
+        setLoading(false);
+        return null;
+      })
+      .then(r => r ? r.json() : null)
+      .then(d => { if (d) setGrabs(d.grabs || []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 

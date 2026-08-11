@@ -29,11 +29,12 @@ function Dashboard({ userEmail }) {
   const [grabCount, setGrabCount] = useState(0);
 
   useEffect(() => {
-    fetch('/api/grabs')
+    if (!userEmail) return;
+    fetch(`/api/grabs?owner_email=${encodeURIComponent(userEmail)}`)
       .then(r => r.json())
       .then(d => setGrabCount(d.grabs?.length || 0))
       .catch(() => {});
-  }, []);
+  }, [userEmail]);
 
   return (
     <div style={{ flex: 1, padding: '28px 36px' }}>

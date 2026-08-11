@@ -11,17 +11,50 @@ function getClient() {
   );
 }
 
+function getClientAuth(request) {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        getAll() { return request.cookies.getAll(); },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        },
+      },
+    }
+  );
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const ownerEmail = searchParams.get('owner_email');
+  const authHeader = request.headers.get('authorization');
+  const modKey = searchParams.get('key');
 
-  const supabase = getClient();
-  let query = supabase.from('grabs').select('*').order('created_at', { ascending: false });
-
-  if (ownerEmail) {
-    query = query.eq('owner_email', ownerEmail);
+  if (modKey === process.env.MOD_API_KEY) {
+    const supabase = getClient();
+    let query = supabase.from('grabs').select('*').order('created_at', { ascending: false });
+    if (ownerEmail) query = query.eq('owner_email', ownerEmail);
+    const { data, error } = await query;
+    if (error) return NextResponse.json({ grabs: [], error: error.message });
+    return NextResponse.json({ grabs: data || [] });
   }
 
+  const supabase = getClientAuth(request);
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  if (user.email !== 'lifegrading@gmail.com') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const supabaseAdmin = getClient();
+  let query = supabaseAdmin.from('grabs').select('*').order('created_at', { ascending: false });
+  if (ownerEmail) query = query.eq('owner_email', ownerEmail);
   const { data, error } = await query;
   if (error) return NextResponse.json({ grabs: [], error: error.message });
   return NextResponse.json({ grabs: data || [] });

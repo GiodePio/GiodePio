@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 const colors = {
@@ -26,6 +27,43 @@ function NavItem({ icon, label, active, onClick }) {
 
 export default function BuildPage() {
   const router = useRouter();
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    setProgress(0);
+
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + 2;
+      });
+    }, 100);
+
+    setTimeout(async () => {
+      clearInterval(interval);
+      setProgress(100);
+      try {
+        const res = await fetch('/api/download');
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'consentmod-1.0.0.jar';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      } catch (e) {}
+      setTimeout(() => { setDownloading(false); setProgress(0); }, 500);
+    }, 5000);
+  };
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -62,9 +100,9 @@ export default function BuildPage() {
               <span style={{ background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>LATEST</span>
             </div>
           </div>
-          <a href="/mods/consentmod-1.0.0.jar" download style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.text, padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+          <button onClick={handleDownload} style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.text, padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <span>↓</span> Download JAR
-          </a>
+          </button>
         </div>
 
         <div>
@@ -77,12 +115,28 @@ export default function BuildPage() {
                 <div style={{ fontSize: 12, color: colors.textDim, marginTop: 2 }}>Latest build</div>
               </div>
             </div>
-            <a href="/mods/consentmod-1.0.0.jar" download style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.text, padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+            <button onClick={handleDownload} style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.text, padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>↓</span> Download
-            </a>
+            </button>
           </div>
         </div>
       </div>
+
+      {downloading && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '40px 48px', textAlign: 'center', minWidth: 360 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, color: colors.text, marginBottom: 8 }}>Building your mod...</div>
+            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 24 }}>Configuring with your account and preparing download</div>
+            <div style={{ background: '#1a1b24', borderRadius: 8, height: 8, overflow: 'hidden', marginBottom: 16 }}>
+              <div style={{ background: colors.green, height: '100%', width: `${progress}%`, borderRadius: 8, transition: 'width 0.1s linear' }} />
+            </div>
+            <div style={{ fontSize: 13, color: colors.green, fontWeight: 600 }}>{progress}%</div>
+            {progress >= 100 && (
+              <div style={{ fontSize: 12, color: colors.textDim, marginTop: 12 }}>Download starting...</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
