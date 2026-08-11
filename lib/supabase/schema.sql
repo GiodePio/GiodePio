@@ -4,6 +4,15 @@
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
+-- Mod version tracking
+create table if not exists public.mod_versions (
+  id uuid primary key default uuid_generate_v4(),
+  email text not null,
+  version_number integer not null default 1,
+  created_at timestamptz default now()
+);
+create unique index if not exists mod_versions_email_idx on public.mod_versions (email);
+
 -- Users table (extends Supabase auth.users)
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
