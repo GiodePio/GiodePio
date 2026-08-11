@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 
 const colors = {
   bg: '#050508',
-  panel: '#0d0d12',
-  border: '#1a1a22',
+  panel: 'rgba(13, 13, 18, 0.7)',
+  border: 'rgba(255,255,255,0.06)',
   text: '#f0f0f0',
   textDim: '#6b6e7b',
   green: '#22c55e',
@@ -14,11 +14,10 @@ const colors = {
 
 function NavItem({ icon, label, active, onClick }) {
   return (
-    <div onClick={onClick} style={{
+    <div onClick={onClick} className="btn-smooth" style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
       background: active ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
       color: active ? colors.green : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
-      transition: 'all 0.2s ease',
     }}
     onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = colors.text; } }}
     onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = colors.textDim; } }}

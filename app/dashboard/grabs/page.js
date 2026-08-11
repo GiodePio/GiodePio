@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 
 const colors = {
   bg: '#050508',
-  panel: '#0d0d12',
-  border: '#1a1a22',
+  panel: 'rgba(13, 13, 18, 0.7)',
+  border: 'rgba(255,255,255,0.06)',
   text: '#f0f0f0',
   textDim: '#6b6e7b',
   green: '#22c55e',
@@ -14,11 +14,10 @@ const colors = {
 
 function NavItem({ icon, label, active, onClick }) {
   return (
-    <div onClick={onClick} style={{
+    <div onClick={onClick} className="btn-smooth" style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
       background: active ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
       color: active ? colors.green : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
-      transition: 'all 0.2s ease',
     }}
     onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = colors.text; } }}
     onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = colors.textDim; } }}
@@ -117,10 +116,10 @@ export default function GrabsPage() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      <aside style={{ width: 220, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #0a0a10 0%, #050508 100%)' }}>
+    <div className="page-enter" style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+      <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#222' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
           <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
         </div>
         <div style={{ flex: 1 }}>
@@ -150,7 +149,8 @@ export default function GrabsPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search..."
-            style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 8, padding: '8px 14px', color: colors.text, fontSize: 13, outline: 'none', width: 220 }}
+            className="glass-card"
+            style={{ borderRadius: 8, padding: '8px 14px', color: colors.text, fontSize: 13, outline: 'none', width: 220, border: '1px solid rgba(255,255,255,0.06)', transition: 'all 0.2s ease' }}
           />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -160,20 +160,19 @@ export default function GrabsPage() {
               <div
                 key={g.id}
                 onClick={() => router.push(`/dashboard/grabs/${g.id}`)}
-                style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', transition: 'all 0.15s ease' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.background = '#15161e'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.background = colors.panel; }}
+                className="glass-card"
+                style={{ borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }}
               >
-                <div style={{ width: 42, height: 42, borderRadius: 10, background: '#1a1b24', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                <div style={{ width: 42, height: 42, borderRadius: 10, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                   <img src={`https://mc-heads.net/avatar/${g.minecraft_username}/42`} alt="" style={{ width: 42, height: 42 }} onError={e => { e.target.style.display = 'none'; }} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{g.minecraft_username}</span>
                     {isUpdated && (
-                      <span style={{ background: '#2a1a0a', color: '#f59e0b', fontSize: 9, padding: '2px 6px', borderRadius: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>*Updated</span>
+                      <span style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', fontSize: 9, padding: '2px 6px', borderRadius: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>*Updated</span>
                     )}
-                    <span style={{ background: '#1a2a2a', color: '#5eead4', fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                    <span style={{ background: 'rgba(94, 234, 212, 0.1)', color: '#5eead4', fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 600, whiteSpace: 'nowrap' }}>
                       {g.os?.includes('Windows') ? 'Windows' : g.os?.includes('Mac') ? 'macOS' : g.os?.includes('Linux') ? 'Linux' : g.os || 'Unknown'}
                     </span>
                   </div>

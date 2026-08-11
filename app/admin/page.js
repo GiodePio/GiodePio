@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 
 const colors = {
   bg: '#050508',
-  panel: '#0d0d12',
-  border: '#1a1a22',
+  panel: 'rgba(13, 13, 18, 0.7)',
+  border: 'rgba(255,255,255,0.06)',
   text: '#f0f0f0',
   textDim: '#6b6e7b',
   green: '#22c55e',
@@ -16,11 +16,10 @@ const colors = {
 
 function NavItem({ icon, label, active, onClick }) {
   return (
-    <div onClick={onClick} style={{
+    <div onClick={onClick} className="btn-smooth" style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
       background: active ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
       color: active ? colors.green : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
-      transition: 'all 0.2s ease',
     }}
     onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = colors.text; } }}
     onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = colors.textDim; } }}
@@ -108,10 +107,10 @@ export default function AdminPage() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      <aside style={{ width: 220, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #0a0a10 0%, #050508 100%)' }}>
+    <div className="page-enter" style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+      <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#222' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
           <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
         </div>
         <div style={{ flex: 1 }}>
@@ -134,13 +133,13 @@ export default function AdminPage() {
             <div style={{ fontSize: 22, fontWeight: 700 }}>Admin Panel</div>
             <div style={{ fontSize: 13, color: colors.textDim, marginTop: 4 }}>Manage user access and pro licenses</div>
           </div>
-          <div style={{ background: '#1a2a1a', color: colors.green, fontSize: 12, padding: '6px 12px', borderRadius: 6, fontWeight: 600 }}>
+          <div style={{ background: 'rgba(34, 197, 94, 0.15)', color: colors.green, fontSize: 12, padding: '6px 12px', borderRadius: 6, fontWeight: 600 }}>
             {users.length} users
           </div>
         </div>
 
-        <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 100px', padding: '12px 20px', borderBottom: `1px solid ${colors.border}`, fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase' }}>
+        <div className="glass-card" style={{ borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 100px', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase' }}>
             <div>Email</div>
             <div>Joined</div>
             <div>Last Login</div>
@@ -148,7 +147,7 @@ export default function AdminPage() {
           </div>
 
           {users.map((u) => (
-            <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 100px', padding: '14px 20px', borderBottom: `1px solid ${colors.border}`, fontSize: 13, alignItems: 'center' }}>
+            <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 100px', padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 13, alignItems: 'center' }}>
               <div>
                 <div style={{ color: colors.text, fontWeight: 500 }}>{u.email}</div>
                 {u.display_name && u.display_name !== u.email && (

