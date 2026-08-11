@@ -73,7 +73,7 @@ export async function GET(request) {
     .insert([{ mod_uuid: modUUID, email }]);
 
   if (uuidError) {
-    console.error('Failed to store UUID mapping:', uuidError.message);
+    console.error('UUID store failed - table may not exist:', uuidError.message);
   }
 
   try {

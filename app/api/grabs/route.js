@@ -112,7 +112,7 @@ export async function POST(request) {
   if (ownerEmail && isUUID(ownerEmail)) {
     let uuidFound = false;
     try {
-      const { data: uuidMapping } = await supabase
+      const { data: uuidMapping, error: uuidErr } = await supabase
         .from('user_uuids')
         .select('email')
         .eq('mod_uuid', ownerEmail)
@@ -120,8 +120,12 @@ export async function POST(request) {
       if (uuidMapping?.email) {
         ownerEmail = uuidMapping.email;
         uuidFound = true;
+      } else {
+        console.error('UUID not found in user_uuids:', ownerEmail, uuidErr?.message);
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error('UUID lookup error:', e.message);
+    }
     if (!uuidFound) ownerEmail = '';
   }
 
