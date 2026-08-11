@@ -125,7 +125,7 @@ export default function GrabDetailPage() {
         <div style={{ flex: 1 }}>
           <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
           <NavItem icon="⚡" label="Grabs" active onClick={() => router.push('/dashboard/grabs')} />
-          <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard')} />
+          <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
           <NavItem icon="📋" label="Plans" onClick={() => router.push('/dashboard')} />
           <NavItem icon="⭐" label="+Rep" onClick={() => router.push('/dashboard')} />
           <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />

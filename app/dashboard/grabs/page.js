@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 
 const colors = {
   bg: '#0a0a0f',
@@ -31,20 +30,11 @@ export default function GrabsPage() {
   const [grabs, setGrabs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    fetch('/api/auth/user')
+    fetch('/api/grabs')
       .then(r => r.json())
-      .then(d => {
-        if (d.user) {
-          setUser(d.user);
-          return fetch(`/api/grabs?owner_email=${encodeURIComponent(d.user.email)}`);
-        }
-        setLoading(false);
-      })
-      .then(r => r ? r.json() : null)
-      .then(d => { if (d) setGrabs(d.grabs || []); setLoading(false); })
+      .then(d => { setGrabs(d.grabs || []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
@@ -79,7 +69,7 @@ export default function GrabsPage() {
         <div style={{ flex: 1 }}>
           <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
           <NavItem icon="⚡" label="Grabs" active onClick={() => {}} />
-          <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard')} />
+          <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
           <NavItem icon="📋" label="Plans" onClick={() => router.push('/dashboard')} />
           <NavItem icon="⭐" label="+Rep" onClick={() => router.push('/dashboard')} />
           <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
@@ -93,11 +83,6 @@ export default function GrabsPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <span style={{ fontSize: 24, fontWeight: 700 }}>Grabs</span>
           <span style={{ color: colors.textDim, fontSize: 14 }}>{grabs.length} captured</span>
-          <div style={{ marginLeft: 'auto' }}>
-            <a href="/api/download" style={{ background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', display: 'inline-block' }}>
-              ↓ Download Mod
-            </a>
-          </div>
         </div>
         <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'flex-end' }}>
           <input
@@ -142,7 +127,7 @@ export default function GrabsPage() {
           {filtered.length === 0 && !loading && (
             <div style={{ textAlign: 'center', color: colors.textDim, fontSize: 13, padding: 60 }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>📭</div>
-              No grabs yet
+              {grabs.length === 0 ? 'No grabs yet' : 'No grabs match your search'}
             </div>
           )}
         </div>
