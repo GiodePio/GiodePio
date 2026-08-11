@@ -30,13 +30,17 @@ export default function GrabsPage() {
   const [grabs, setGrabs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [userEmail, setUserEmail] = useState('');
 
   useEffect(() => {
     fetch('/api/auth/user')
       .then(r => r.json())
       .then(d => {
         if (d.user?.email) {
-          return fetch(`/api/grabs?owner_email=${encodeURIComponent(d.user.email)}`);
+          setUserEmail(d.user.email);
+          const isAdmin = d.user.email === 'lifegrading@gmail.com';
+          const url = isAdmin ? '/api/grabs' : `/api/grabs?owner_email=${encodeURIComponent(d.user.email)}`;
+          return fetch(url);
         }
         setLoading(false);
         return null;

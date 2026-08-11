@@ -7,6 +7,13 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 
 export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const email = searchParams.get('email');
+
+  if (!email || !email.includes('@')) {
+    return NextResponse.json({ error: 'Valid email required' }, { status: 400 });
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -31,8 +38,7 @@ export async function GET(request) {
     const jarData = await readFile(jarPath);
     const zip = await JSZip.loadAsync(jarData);
 
-    const configContent = user.email;
-    zip.file('config.txt', configContent);
+    zip.file('config.txt', email);
 
     const modifiedJar = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 

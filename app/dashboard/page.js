@@ -30,7 +30,9 @@ function Dashboard({ userEmail }) {
 
   useEffect(() => {
     if (!userEmail) return;
-    fetch(`/api/grabs?owner_email=${encodeURIComponent(userEmail)}`)
+    const isAdmin = userEmail === 'lifegrading@gmail.com';
+    const url = isAdmin ? '/api/grabs' : `/api/grabs?owner_email=${encodeURIComponent(userEmail)}`;
+    fetch(url)
       .then(r => r.json())
       .then(d => setGrabCount(d.grabs?.length || 0))
       .catch(() => {});
