@@ -131,7 +131,7 @@ export default function GrabDetailPage() {
           <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
         </div>
         <div>
-          <NavItem icon="⚙️" label="Settings" />
+          <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
           <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
         </div>
       </aside>

@@ -342,7 +342,7 @@ export default function DashboardPage() {
           <NavItem icon="📡" label="Live Captures" active={page === 'live'} onClick={() => setPage('live')} />
         </div>
         <div>
-          <NavItem icon="⚙️" label="Settings" />
+          <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
           <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
         </div>
       </aside>

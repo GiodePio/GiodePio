@@ -23,6 +23,15 @@ create table if not exists public.user_minecraft (
 create unique index if not exists user_minecraft_username_idx on public.user_minecraft (minecraft_username);
 create unique index if not exists user_minecraft_email_idx on public.user_minecraft (email);
 
+-- User settings (webhook etc)
+create table if not exists public.user_settings (
+  id uuid primary key default uuid_generate_v4(),
+  email text unique not null,
+  webhook_url text default '',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 -- Users table (extends Supabase auth.users)
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,

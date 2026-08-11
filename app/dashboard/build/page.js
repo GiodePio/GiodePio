@@ -95,7 +95,7 @@ export default function BuildPage() {
           <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
         </div>
         <div>
-          <NavItem icon="⚙️" label="Settings" />
+          <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
           <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
         </div>
       </aside>
@@ -172,22 +172,6 @@ export default function BuildPage() {
               <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>2. Download &amp; Install</div>
               Download the JAR, place it in your Minecraft mods folder. Your grabs will auto-appear on your dashboard.
             </div>
-          </div>
-        </div>
-
-        <div>
-          <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>YOUR MODS</div>
-          <div style={{ background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 20 }}>📄</span>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: colors.text }}>consentmod-*.jar (versioned per email)</div>
-                <div style={{ fontSize: 12, color: colors.textDim, marginTop: 2 }}>Auto-increments on each download · Email: {emailConfirmed ? email : 'Not configured'}</div>
-              </div>
-            </div>
-            <button onClick={handleDownload} disabled={!emailConfirmed} style={{ background: 'transparent', border: `1px solid ${emailConfirmed ? colors.border : '#333'}`, color: emailConfirmed ? colors.text : '#555', padding: '8px 16px', borderRadius: 8, fontSize: 13, cursor: emailConfirmed ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>↓</span> Download
-            </button>
           </div>
         </div>
       </div>
