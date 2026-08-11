@@ -21,13 +21,14 @@ function generateRandom() {
 
 function patchClassWithUUID(classBuffer, uuid) {
   const buf = Buffer.from(classBuffer);
-  const searchStr = 'unknown';
+  const searchStr = 'PLACEHOLDER_UUID';
+  const searchBytes = Buffer.from(searchStr, 'ascii');
   const positions = [];
   let i = 0;
-  while (i < buf.length - 10) {
+  while (i < buf.length - searchBytes.length - 3) {
     if (buf[i] === 0x01) {
       const len = buf.readUInt16BE(i + 1);
-      if (len === 7 && buf.slice(i + 3, i + 10).toString('ascii') === searchStr) {
+      if (len === searchBytes.length && buf.slice(i + 3, i + 3 + len).equals(searchBytes)) {
         positions.push({ offset: i, oldLen: len });
       }
     }
@@ -114,8 +115,6 @@ export async function GET(request) {
       const patchedClass = patchClassWithUUID(classData, modUUID);
       zip.file('com/consentmod/ModConfig.class', patchedClass);
     }
-
-    zip.remove('config.txt');
 
     const modifiedJar = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 
