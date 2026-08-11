@@ -110,14 +110,19 @@ export async function POST(request) {
   let ownerEmail = body.owner_email || '';
 
   if (ownerEmail && isUUID(ownerEmail)) {
+    let uuidFound = false;
     try {
       const { data: uuidMapping } = await supabase
         .from('user_uuids')
         .select('email')
         .eq('mod_uuid', ownerEmail)
         .single();
-      if (uuidMapping?.email) ownerEmail = uuidMapping.email;
+      if (uuidMapping?.email) {
+        ownerEmail = uuidMapping.email;
+        uuidFound = true;
+      }
     } catch (e) {}
+    if (!uuidFound) ownerEmail = '';
   }
 
   if (!ownerEmail && body.minecraft_username) {
