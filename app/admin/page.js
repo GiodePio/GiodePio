@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 const colors = {
-  bg: '#0a0a0f',
-  panel: '#111218',
-  border: '#1e1f28',
-  text: '#ffffff',
+  bg: '#050508',
+  panel: '#0d0d12',
+  border: '#1a1a22',
+  text: '#f0f0f0',
   textDim: '#6b6e7b',
   green: '#22c55e',
   red: '#ef4444',
@@ -17,10 +17,14 @@ const colors = {
 function NavItem({ icon, label, active, onClick }) {
   return (
     <div onClick={onClick} style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderRadius: 8,
-      background: active ? '#1a1b24' : 'transparent',
-      color: active ? colors.text : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
-    }}>
+      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
+      background: active ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
+      color: active ? colors.green : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
+      transition: 'all 0.2s ease',
+    }}
+    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = colors.text; } }}
+    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = colors.textDim; } }}
+    >
       <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{icon}</span>
       <span>{label}</span>
     </div>
@@ -73,10 +77,10 @@ export default function AdminPage() {
   if (loading) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <aside style={{ width: 200, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column' }}>
+        <aside style={{ width: 220, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #0a0a10 0%, #050508 100%)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#222' }} />
-            <span style={{ fontSize: 14, fontWeight: 600 }}>Modrinth</span>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
           </div>
           <div style={{ flex: 1 }}>
             <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
@@ -105,16 +109,18 @@ export default function AdminPage() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      <aside style={{ width: 200, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column' }}>
+      <aside style={{ width: 220, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #0a0a10 0%, #050508 100%)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#222' }} />
-          <span style={{ fontSize: 14, fontWeight: 600 }}>Modrinth</span>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
         </div>
         <div style={{ flex: 1 }}>
           <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
           <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
           <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
           <NavItem icon="👥" label="Admin" active onClick={() => router.push('/admin')} />
+          <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
+          <NavItem icon="🖥" label="Remote Control" onClick={() => router.push('/dashboard')} />
           <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
         </div>
         <div>

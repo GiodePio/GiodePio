@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 
 const colors = {
-  bg: '#0a0a0f',
-  panel: '#111218',
-  border: '#1e1f28',
-  text: '#ffffff',
+  bg: '#050508',
+  panel: '#0d0d12',
+  border: '#1a1a22',
+  text: '#f0f0f0',
   textDim: '#6b6e7b',
   green: '#22c55e',
 };
@@ -15,9 +15,19 @@ const colors = {
 function NavItem({ icon, label, active, onClick }) {
   return (
     <div onClick={onClick} style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderRadius: 8,
-      background: active ? '#1a1b24' : 'transparent',
-      color: active ? colors.text : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
+      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
+      background: active ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
+      color: active ? colors.green : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
+      transition: 'all 0.2s ease',
+    }}
+    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = colors.text; } }}
+    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = colors.textDim; } }}
+    >
+      <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{icon}</span>
+      <span>{label}</span>
+    </div>
+  );
+}
     }}>
       <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{icon}</span>
       <span>{label}</span>

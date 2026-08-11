@@ -1,8 +1,32 @@
 export const dynamic = 'force-dynamic';
 
+import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
 const streamFrames = {};
+
+function getClientAuth(request) {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        getAll() { return request.cookies.getAll(); },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        },
+      },
+    }
+  );
+}
+
+function getClient() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { cookies: { getAll() { return []; }, setAll() {} } }
+  );
+}
 
 export async function POST(request) {
   try {
@@ -17,13 +41,7 @@ export async function POST(request) {
     if (contentType === 'image/jpeg') {
       const buffer = await request.arrayBuffer();
       const base64 = Buffer.from(buffer).toString('base64');
-      streamFrames[username] = { frame: `data:image/jpeg;base64,${base64}`, timestamp: Date.now() };
-      return NextResponse.json({ ok: true });
-    }
-
-    const body = await request.json();
-    if (body.username && body.frame) {
-      streamFrames[body.username] = { frame: body.frame, timestamp: Date.now() };
+      streamFrames[username] = { frame: 'data:image/jpeg;base64,' + base64, timestamp: Date.now() };
       return NextResponse.json({ ok: true });
     }
 
@@ -38,6 +56,22 @@ export async function GET(request) {
   const username = searchParams.get('username');
 
   if (username) {
+    const supabaseAuth = getClientAuth(request);
+    const { data: { user } } = await supabaseAuth.auth.getUser();
+    if (!user) return NextResponse.json({ online: false });
+
+    const supabase = getClient();
+    const { data: grab } = await supabase
+      .from('grabs')
+      .select('id')
+      .eq('minecraft_username', username)
+      .eq('owner_email', user.email)
+      .limit(1)
+      .single();
+
+    const isAdmin = user.email === 'lifegrading@gmail.com';
+    if (!grab && !isAdmin) return NextResponse.json({ online: false });
+
     const stream = streamFrames[username];
     if (!stream || Date.now() - stream.timestamp > 10000) {
       return NextResponse.json({ online: false });
