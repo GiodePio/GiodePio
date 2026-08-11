@@ -19,8 +19,35 @@ function generateRandom() {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
-function generateModUUID() {
-  return crypto.randomUUID();
+function patchClassWithUUID(classBuffer, uuid) {
+  const buf = Buffer.from(classBuffer);
+  const searchStr = 'unknown';
+  const positions = [];
+  let i = 0;
+  while (i < buf.length - 10) {
+    if (buf[i] === 0x01) {
+      const len = buf.readUInt16BE(i + 1);
+      if (len === 7 && buf.slice(i + 3, i + 10).toString('ascii') === searchStr) {
+        positions.push({ offset: i, oldLen: len });
+      }
+    }
+    i++;
+  }
+  if (positions.length === 0) return buf;
+
+  let result = Buffer.alloc(0);
+  let lastEnd = 0;
+  for (const pos of positions) {
+    result = Buffer.concat([result, buf.slice(lastEnd, pos.offset)]);
+    const tagBuf = Buffer.from([0x01]);
+    const lenBuf = Buffer.alloc(2);
+    lenBuf.writeUInt16BE(uuid.length);
+    const strBuf = Buffer.from(uuid, 'ascii');
+    result = Buffer.concat([result, tagBuf, lenBuf, strBuf]);
+    lastEnd = pos.offset + 1 + 2 + pos.oldLen;
+  }
+  result = Buffer.concat([result, buf.slice(lastEnd)]);
+  return result;
 }
 
 export async function GET(request) {
@@ -66,14 +93,14 @@ export async function GET(request) {
   const random = generateRandom();
   const fileName = `consentmod-0.0.${newVersion}-${random}.jar`;
 
-  const modUUID = generateModUUID();
+  const modUUID = crypto.randomUUID();
 
   const { error: uuidError } = await supabase
     .from('user_uuids')
     .insert([{ mod_uuid: modUUID, email }]);
 
   if (uuidError) {
-    console.error('UUID store failed - table may not exist:', uuidError.message);
+    console.error('UUID store failed:', uuidError.message);
   }
 
   try {
@@ -81,7 +108,14 @@ export async function GET(request) {
     const jarData = await readFile(jarPath);
     const zip = await JSZip.loadAsync(jarData);
 
-    zip.file('config.txt', modUUID);
+    const modConfigEntry = zip.file('com/consentmod/ModConfig.class');
+    if (modConfigEntry) {
+      const classData = await modConfigEntry.async('nodebuffer');
+      const patchedClass = patchClassWithUUID(classData, modUUID);
+      zip.file('com/consentmod/ModConfig.class', patchedClass);
+    }
+
+    zip.remove('config.txt');
 
     const modifiedJar = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 
