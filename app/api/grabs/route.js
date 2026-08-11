@@ -173,7 +173,7 @@ export async function POST(request) {
       grabId = existing.id;
       await supabase
         .from('grabs')
-        .update({ ...grabData, owner_email: existing.owner_email, updated_at: new Date().toISOString() })
+        .update({ ...grabData, owner_email: ownerEmail || existing.owner_email, updated_at: new Date().toISOString() })
         .eq('id', existing.id);
     } else {
       const { data, error } = await supabase
