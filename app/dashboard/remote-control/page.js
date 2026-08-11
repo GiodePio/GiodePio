@@ -4,17 +4,21 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 const colors = {
-  bg: '#050508',
-  panel: 'rgba(13, 13, 18, 0.7)',
+  bg: '#0a0a0f',
+  surface: '#12121a',
+  surfaceHover: '#1a1a24',
   border: 'rgba(255,255,255,0.06)',
+  borderHover: 'rgba(255,255,255,0.12)',
   text: '#f0f0f0',
   textDim: '#6b6e7b',
   green: '#22c55e',
+  greenBg: 'rgba(34, 197, 94, 0.12)',
+  red: '#ef4444',
 };
 
 function NavItem({ icon, label, active, onClick }) {
   return (
-    <div onClick={onClick} className="btn-smooth" style={{
+    <div onClick={onClick} style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
       background: active ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
       color: active ? colors.green : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
@@ -28,10 +32,18 @@ function NavItem({ icon, label, active, onClick }) {
   );
 }
 
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 export default function RemoteControlPage() {
   const router = useRouter();
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetch('/api/stream')
@@ -45,9 +57,11 @@ export default function RemoteControlPage() {
     return () => clearInterval(iv);
   }, []);
 
+  const filtered = onlineUsers.filter(u => u.username.toLowerCase().includes(search.toLowerCase()));
+
   return (
-    <div className="page-enter" style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+      <aside style={{ width: 220, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column', background: colors.surface }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
           <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
@@ -65,32 +79,73 @@ export default function RemoteControlPage() {
         </div>
       </aside>
 
-      <main style={{ flex: 1, padding: '28px 36px' }}>
+      <main style={{ flex: 1, padding: '32px 40px' }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>{getGreeting()}, there.</h1>
+        <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4, marginBottom: 28 }}>Your workspace is ready.</p>
+
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Remote Control</h1>
-            <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4 }}>{onlineUsers.length} user{onlineUsers.length !== 1 ? 's' : ''} online</p>
+          <span style={{ fontSize: 14, color: colors.textDim }}>{onlineUsers.length} available device{onlineUsers.length !== 1 ? 's' : ''} for remote control</span>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: colors.textDim, fontSize: 14 }}>🔍</span>
+            <input
+              placeholder="Search devices..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{
+                background: colors.surface,
+                border: `1px solid ${colors.border}`,
+                borderRadius: 8,
+                padding: '8px 14px 8px 34px',
+                color: colors.text,
+                fontSize: 13,
+                width: 200,
+                outline: 'none',
+              }}
+              onFocus={e => e.target.style.borderColor = colors.borderHover}
+              onBlur={e => e.target.style.borderColor = colors.border}
+            />
           </div>
         </div>
 
         {loading ? (
-          <div className="glass-card" style={{ borderRadius: 12, height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading...</div>
-        ) : onlineUsers.length === 0 ? (
-          <div className="glass-card" style={{ borderRadius: 12, height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
-            <span style={{ fontSize: 28, marginBottom: 8 }}>No users online</span>
-            <span style={{ fontSize: 13 }}>Users will appear here when they join a server</span>
+          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading...</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
+            <span style={{ fontSize: 28, marginBottom: 8 }}>{onlineUsers.length === 0 ? '📡' : '🔍'}</span>
+            <span style={{ fontSize: 14 }}>{onlineUsers.length === 0 ? 'No devices online' : 'No devices match your search'}</span>
           </div>
         ) : (
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
-            {onlineUsers.map(u => (
-              <div key={u.username} onClick={() => router.push('/dashboard/remote-control/' + encodeURIComponent(u.username))} className="glass-card" style={{ cursor: 'pointer', border: '1px solid ' + colors.border, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = colors.green; e.currentTarget.style.background = 'rgba(34, 197, 94, 0.04)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.background = 'transparent'; }}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {filtered.map(u => (
+              <div key={u.username} onClick={() => router.push('/dashboard/remote-control/' + encodeURIComponent(u.username))} style={{
+                background: colors.surface,
+                border: `1px solid ${colors.border}`,
+                borderRadius: 12,
+                padding: '14px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = colors.surfaceHover; e.currentTarget.style.borderColor = colors.borderHover; }}
+              onMouseLeave={e => { e.currentTarget.style.background = colors.surface; e.currentTarget.style.borderColor = colors.border; }}
               >
-                <img src={'https://mc-heads.net/avatar/' + u.username + '/32'} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: colors.text }}>{u.username}</div>
-                  <div style={{ fontSize: 11, color: colors.green }}>Live</div>
+                <div style={{ position: 'relative' }}>
+                  <img src={'https://mc-heads.net/avatar/' + u.username + '/40'} alt="" style={{ width: 40, height: 40, borderRadius: 8 }} />
+                  <div style={{ position: 'absolute', bottom: -2, right: -2, width: 12, height: 12, borderRadius: '50%', background: colors.green, border: `2px solid ${colors.surface}` }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>{u.username}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: colors.textDim, background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: 4 }}>
+                      <span style={{ fontSize: 12 }}>🪟</span> Windows
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 12, color: colors.green, background: colors.greenBg, padding: '4px 10px', borderRadius: 6, fontWeight: 500 }}>Online</span>
+                  <span style={{ color: colors.textDim, fontSize: 18 }}>→</span>
                 </div>
               </div>
             ))}
