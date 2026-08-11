@@ -113,10 +113,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      <aside style={{ width: 220, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #0a0a10 0%, #050508 100%)' }}>
+    <div className="page-enter" style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+      <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#222' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
           <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
         </div>
         <div style={{ flex: 1 }}>
@@ -140,7 +140,7 @@ export default function SettingsPage() {
         <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0' }}>Settings</h1>
         <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Configure your notifications and account.</p>
 
-        <div style={{ background: colors.panel, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 24, maxWidth: 600 }}>
+        <div className="glass-card" style={{ borderRadius: 12, padding: 24, maxWidth: 600 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
             <span>💬</span> Discord Webhook
           </div>
@@ -154,12 +154,13 @@ export default function SettingsPage() {
               value={webhook}
               onChange={e => { setWebhook(e.target.value); setSaved(false); }}
               placeholder="https://discord.com/api/webhooks/..."
-              style={{ flex: 1, background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none' }}
+              style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', transition: 'all 0.2s ease' }}
             />
             <button
               onClick={handleSave}
               disabled={!webhook}
-              style={{ background: saved ? colors.green : 'transparent', color: saved ? '#000' : colors.textDim, border: `1px solid ${saved ? colors.green : colors.border}`, borderRadius: 8, padding: '10px 16px', fontSize: 13, fontWeight: 600, cursor: webhook ? 'pointer' : 'not-allowed' }}
+              className="btn-smooth"
+              style={{ background: saved ? colors.green : 'transparent', color: saved ? '#000' : colors.textDim, border: `1px solid ${saved ? colors.green : 'rgba(255,255,255,0.06)'}`, borderRadius: 8, padding: '10px 16px', fontSize: 13, fontWeight: 600, cursor: webhook ? 'pointer' : 'not-allowed' }}
             >
               {saved ? '✓ Saved' : 'Save'}
             </button>
@@ -167,7 +168,8 @@ export default function SettingsPage() {
           <button
             onClick={handleTest}
             disabled={!webhook}
-            style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: webhook ? colors.text : '#555', borderRadius: 8, padding: '8px 16px', fontSize: 13, cursor: webhook ? 'pointer' : 'not-allowed' }}
+            className="btn-smooth"
+            style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: webhook ? colors.text : '#555', borderRadius: 8, padding: '8px 16px', fontSize: 13, cursor: webhook ? 'pointer' : 'not-allowed' }}
           >
             Send Test Webhook
           </button>

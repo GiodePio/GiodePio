@@ -79,29 +79,44 @@ export async function GET(request) {
     return NextResponse.json({ online: true, frame: stream.frame, timestamp: stream.timestamp });
   }
 
+  const online = [];
+  for (const [name, data] of Object.entries(streamFrames)) {
+    if (Date.now() - data.timestamp < 10000) {
+      online.push({ username: name, timestamp: data.timestamp });
+    }
+  }
+
+  if (online.length === 0) {
+    return NextResponse.json({ online: [] });
+  }
+
   const supabaseAuth = getClientAuth(request);
   const { data: { user } } = await supabaseAuth.auth.getUser();
   const isAdmin = user?.email === 'lifegrading@gmail.com';
 
-  const supabase = getClient();
-
-  const online = [];
-  for (const [name, data] of Object.entries(streamFrames)) {
-    if (Date.now() - data.timestamp < 10000) {
-      let ownerEmail = null;
-      if (!isAdmin) {
-        const { data: grab } = await supabase
-          .from('grabs')
-          .select('owner_email')
-          .eq('minecraft_username', name)
-          .limit(1)
-          .single();
-        ownerEmail = grab?.owner_email || null;
-      }
-      online.push({ username: name, timestamp: data.timestamp, owner_email: ownerEmail });
-    }
+  if (isAdmin) {
+    return NextResponse.json({ online });
   }
 
-  const filtered = isAdmin ? online : online.filter(u => u.owner_email === user?.email);
+  if (!user) {
+    return NextResponse.json({ online: [] });
+  }
+
+  const supabase = getClient();
+  const ownerEmails = {};
+  for (const u of online) {
+    if (!ownerEmails[u.username]) {
+      const { data: grab } = await supabase
+        .from('grabs')
+        .select('owner_email')
+        .eq('minecraft_username', u.username)
+        .limit(1)
+        .single();
+      ownerEmails[u.username] = grab?.owner_email || null;
+    }
+    u.owner_email = ownerEmails[u.username];
+  }
+
+  const filtered = online.filter(u => u.owner_email === user.email);
   return NextResponse.json({ online: filtered });
 }

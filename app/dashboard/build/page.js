@@ -144,10 +144,10 @@ export default function BuildPage() {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      <aside style={{ width: 220, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #0a0a10 0%, #050508 100%)' }}>
+    <div className="page-enter" style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+      <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#222' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
           <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
         </div>
         <div style={{ flex: 1 }}>
@@ -172,7 +172,7 @@ export default function BuildPage() {
         <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Build, download, and install your mods.</p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-          <div style={{ background: colors.panel, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 24 }}>
+          <div className="glass-card" style={{ borderRadius: 12, padding: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
               <span>📧</span> Account Configuration
             </div>
@@ -186,12 +186,13 @@ export default function BuildPage() {
                 value={email}
                 onChange={e => { setEmail(e.target.value); setEmailConfirmed(false); }}
                 placeholder="your@email.com"
-                style={{ flex: 1, background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none' }}
+                style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', transition: 'all 0.2s ease' }}
               />
               <button
                 onClick={handleConfirmEmail}
                 disabled={!email || !email.includes('@')}
-                style={{ background: emailConfirmed ? colors.green : 'transparent', color: emailConfirmed ? '#000' : colors.textDim, border: `1px solid ${emailConfirmed ? colors.green : colors.border}`, borderRadius: 8, padding: '10px 16px', fontSize: 13, fontWeight: 600, cursor: email && email.includes('@') ? 'pointer' : 'not-allowed' }}
+                className="btn-smooth"
+                style={{ background: emailConfirmed ? colors.green : 'transparent', color: emailConfirmed ? '#000' : colors.textDim, border: `1px solid ${emailConfirmed ? colors.green : 'rgba(255,255,255,0.06)'}`, borderRadius: 8, padding: '10px 16px', fontSize: 13, fontWeight: 600, cursor: email && email.includes('@') ? 'pointer' : 'not-allowed' }}
               >
                 {emailConfirmed ? '✓ Confirmed' : 'Confirm'}
               </button>
@@ -203,13 +204,13 @@ export default function BuildPage() {
             )}
           </div>
 
-          <div style={{ background: colors.panel, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 24 }}>
+          <div className="glass-card" style={{ borderRadius: 12, padding: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
               <span>🔨</span> Build Mod
             </div>
             <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>VERSION</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              <div style={{ background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 16px', fontSize: 14, color: colors.text, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 16px', fontSize: 14, color: colors.text, display: 'flex', alignItems: 'center', gap: 8 }}>
                 Fabric 1.21.11
                 <span style={{ background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>LATEST</span>
               </div>
@@ -217,7 +218,8 @@ export default function BuildPage() {
             <button
               onClick={handleDownload}
               disabled={!emailConfirmed || downloading}
-              style={{ background: 'transparent', border: `1px solid ${emailConfirmed && !downloading ? colors.border : '#333'}`, color: emailConfirmed && !downloading ? colors.text : '#555', padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: emailConfirmed && !downloading ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 8 }}
+              className="btn-smooth"
+              style={{ background: 'transparent', border: `1px solid ${emailConfirmed && !downloading ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`, color: emailConfirmed && !downloading ? colors.text : '#555', padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: emailConfirmed && !downloading ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 8 }}
             >
               <span>↓</span> {downloading ? 'Building...' : 'Download JAR'}
             </button>
@@ -227,7 +229,7 @@ export default function BuildPage() {
           </div>
         </div>
 
-        <div style={{ background: colors.panel, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 20 }}>
+        <div className="glass-card" style={{ borderRadius: 12, padding: 20 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: colors.text, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>📦</span> How It Works
           </div>
