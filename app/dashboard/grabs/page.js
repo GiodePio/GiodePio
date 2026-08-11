@@ -31,6 +31,8 @@ export default function GrabsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [isPro, setIsPro] = useState(false);
+  const [proChecked, setProChecked] = useState(false);
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -44,9 +46,19 @@ export default function GrabsPage() {
       .then(d => {
         if (d.user?.email) {
           setUserEmail(d.user.email);
-          const isAdmin = d.user.email === 'lifegrading@gmail.com';
-          const url = isAdmin ? '/api/grabs' : `/api/grabs?owner_email=${encodeURIComponent(d.user.email)}`;
-          return fetch(url);
+          if (d.user.email === 'lifegrading@gmail.com') {
+            setIsPro(true);
+            setProChecked(true);
+            const url = '/api/grabs';
+            return fetch(url);
+          } else {
+            fetch('/api/user/pro')
+              .then(r => r.json())
+              .then(p => { setIsPro(p.is_pro); setProChecked(true); })
+              .catch(() => { setIsPro(false); setProChecked(true); });
+            const url = `/api/grabs?owner_email=${encodeURIComponent(d.user.email)}`;
+            return fetch(url);
+          }
         }
         setLoading(false);
         return null;
@@ -79,6 +91,27 @@ export default function GrabsPage() {
     );
   });
 
+  if (!proChecked) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isPro && userEmail !== 'lifegrading@gmail.com') {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+          <div style={{ fontSize: 48 }}>🔒</div>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>Pro Required</div>
+          <div style={{ fontSize: 14, color: colors.textDim }}>You need a Pro license to access Grabs.</div>
+          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: '#3b82f6', fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <aside style={{ width: 200, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column' }}>
@@ -90,6 +123,9 @@ export default function GrabsPage() {
           <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
           <NavItem icon="⚡" label="Grabs" active onClick={() => {}} />
           <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
+          {userEmail === 'lifegrading@gmail.com' && (
+            <NavItem icon="👥" label="Admin" onClick={() => router.push('/admin')} />
+          )}
           <NavItem icon="📋" label="Plans" onClick={() => router.push('/dashboard')} />
           <NavItem icon="⭐" label="+Rep" onClick={() => router.push('/dashboard')} />
           <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 const colors = {
   bg: '#0a0a0f',
@@ -10,10 +11,10 @@ const colors = {
   textDim: '#6b6e7b',
   green: '#22c55e',
   red: '#ef4444',
-  yellow: '#eab308',
+  blue: '#3b82f6',
 };
 
-function NavItem({ icon, label, active, onClick, badge }) {
+function NavItem({ icon, label, active, onClick }) {
   return (
     <div onClick={onClick} style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderRadius: 8,
@@ -21,204 +22,168 @@ function NavItem({ icon, label, active, onClick, badge }) {
       color: active ? colors.text : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
     }}>
       <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{icon}</span>
-      <span style={{ flex: 1 }}>{label}</span>
-      {badge && <span style={{ background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>{badge}</span>}
-    </div>
-  );
-}
-
-function StatCard({ icon, label, value, color }) {
-  return (
-    <div style={{ background: colors.panel, borderRadius: 10, padding: 18, border: `1px solid ${colors.border}`, flex: 1 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: colors.textDim, fontSize: 12, marginBottom: 10 }}>
-        <span style={{ fontSize: 14 }}>{icon}</span> {label}
-      </div>
-      <div style={{ fontSize: 28, fontWeight: 700, color: color || colors.text }}>{value}</div>
-    </div>
-  );
-}
-
-function Overview({ stats }) {
-  return (
-    <div style={{ padding: 28 }}>
-      <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 20px 0' }}>Overview</h2>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-        <StatCard icon="👥" label="Total Users" value={stats?.totalUsers || 0} />
-        <StatCard icon="✅" label="Active Users" value={(stats?.totalUsers || 0) - (stats?.bannedUsers || 0) - (stats?.suspendedUsers || 0)} color={colors.green} />
-        <StatCard icon="🚫" label="Banned" value={stats?.bannedUsers || 0} color={colors.red} />
-        <StatCard icon="⏸️" label="Suspended" value={stats?.suspendedUsers || 0} color={colors.yellow} />
-      </div>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-        <StatCard icon="🔑" label="Admins" value={stats?.admins || 0} />
-        <StatCard icon="🔗" label="Endpoints" value={stats?.activeEndpoints || 0} />
-        <StatCard icon="📊" label="Requests Today" value={stats?.requestsToday || 0} />
-        <StatCard icon="❌" label="Failed" value={stats?.failedRequests || 0} color={colors.red} />
-      </div>
-    </div>
-  );
-}
-
-function UsersPage() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-
-  useEffect(() => {
-    fetchUsers();
-  }, [page, search]);
-
-  const fetchUsers = async () => {
-    setLoading(true);
-    const params = new URLSearchParams({ page, limit: 20, search });
-    const res = await fetch(`/api/admin/users?${params}`);
-    const data = await res.json();
-    setUsers(data.users || []);
-    setTotal(data.total || 0);
-    setLoading(false);
-  };
-
-  const handleAction = async (userId, action, data = {}) => {
-    if (action === 'delete' && !confirm('Delete this user?')) return;
-    if (action === 'ban' && !confirm('Ban this user?')) return;
-
-    await fetch('/api/admin/users', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, action, data }),
-    });
-    fetchUsers();
-  };
-
-  return (
-    <div style={{ padding: 28 }}>
-      <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 20px 0' }}>Users</h2>
-      <input
-        value={search}
-        onChange={e => { setSearch(e.target.value); setPage(1); }}
-        placeholder="Search users..."
-        style={{ width: 300, background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', marginBottom: 20 }}
-      />
-      <div style={{ background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
-              <th style={{ padding: '12px 16px', textAlign: 'left', color: colors.textDim, fontWeight: 500 }}>User</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', color: colors.textDim, fontWeight: 500 }}>Role</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', color: colors.textDim, fontWeight: 500 }}>Status</th>
-              <th style={{ padding: '12px 16px', textAlign: 'left', color: colors.textDim, fontWeight: 500 }}>Created</th>
-              <th style={{ padding: '12px 16px', textAlign: 'right', color: colors.textDim, fontWeight: 500 }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map(user => (
-              <tr key={user.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
-                <td style={{ padding: '12px 16px' }}>
-                  <div style={{ fontWeight: 500 }}>{user.display_name || user.email}</div>
-                  <div style={{ fontSize: 12, color: colors.textDim }}>{user.email}</div>
-                </td>
-                <td style={{ padding: '12px 16px' }}>
-                  <span style={{ background: '#1a2a1a', color: colors.green, padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600 }}>{user.role}</span>
-                </td>
-                <td style={{ padding: '12px 16px' }}>
-                  <span style={{
-                    background: user.status === 'active' ? '#1a2a1a' : user.status === 'banned' ? '#2a1a1a' : '#2a2a1a',
-                    color: user.status === 'active' ? colors.green : user.status === 'banned' ? colors.red : colors.yellow,
-                    padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
-                  }}>{user.status}</span>
-                </td>
-                <td style={{ padding: '12px 16px', color: colors.textDim }}>{new Date(user.created_at).toLocaleDateString()}</td>
-                <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                  <select
-                    onChange={e => {
-                      const [action, value] = e.target.value.split(':');
-                      if (action === 'role') handleAction(user.id, 'update_role', { role: value });
-                      else handleAction(user.id, action);
-                    }}
-                    style={{ background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '6px 10px', color: colors.text, fontSize: 12 }}
-                  >
-                    <option value="">Actions</option>
-                    <option value="role:administrator">Make Admin</option>
-                    <option value="role:moderator">Make Mod</option>
-                    <option value="role:user">Make User</option>
-                    {user.status === 'active' && <option value="ban">Ban</option>}
-                    {user.status === 'active' && <option value="suspend">Suspend</option>}
-                    {user.status === 'banned' && <option value="unban">Unban</option>}
-                    {user.status === 'suspended' && <option value="unsuspend">Unsuspend</option>}
-                    <option value="delete">Delete</option>
-                  </select>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {loading && <div style={{ padding: 20, textAlign: 'center', color: colors.textDim }}>Loading...</div>}
-        {!loading && users.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: colors.textDim }}>No users found</div>}
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, fontSize: 13, color: colors.textDim }}>
-        <span>Total: {total} users</span>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button disabled={page === 1} onClick={() => setPage(p => p - 1)} style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '6px 12px', color: colors.text, cursor: 'pointer' }}>Previous</button>
-          <span style={{ padding: '6px 12px' }}>Page {page}</span>
-          <button disabled={users.length < 20} onClick={() => setPage(p => p + 1)} style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 6, padding: '6px 12px', color: colors.text, cursor: 'pointer' }}>Next</button>
-        </div>
-      </div>
+      <span>{label}</span>
     </div>
   );
 }
 
 export default function AdminPage() {
-  const [page, setPage] = useState('overview');
-  const [stats, setStats] = useState(null);
-  const [user, setUser] = useState(null);
+  const router = useRouter();
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [unauthorized, setUnauthorized] = useState(false);
+  const [toggling, setToggling] = useState(null);
 
   useEffect(() => {
-    fetch('/api/auth/user').then(r => r.json()).then(d => setUser(d.user));
-    fetch('/api/admin/stats').then(r => r.json()).then(d => setStats(d.stats));
+    fetch('/api/auth/user')
+      .then(r => r.json())
+      .then(d => {
+        if (!d.user || d.user.email !== 'lifegrading@gmail.com') {
+          setUnauthorized(true);
+          setLoading(false);
+          return;
+        }
+        fetchUsers();
+      })
+      .catch(() => { setUnauthorized(true); setLoading(false); });
   }, []);
 
-  if (!user) {
-    return <div style={{ minHeight: '100vh', background: colors.bg, color: colors.text, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>;
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/admin/users');
+      const data = await res.json();
+      setUsers(data.users || []);
+    } catch (e) {}
+    setLoading(false);
+  };
+
+  const togglePro = async (email, currentValue) => {
+    setToggling(email);
+    try {
+      await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, is_pro: !currentValue }),
+      });
+      setUsers(prev => prev.map(u => u.email === email ? { ...u, is_pro: !currentValue } : u));
+    } catch (e) {}
+    setToggling(null);
+  };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <aside style={{ width: 200, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#222' }} />
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Modrinth</span>
+          </div>
+          <div style={{ flex: 1 }}>
+            <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
+            <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
+            <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
+            <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
+          </div>
+        </aside>
+        <div style={{ flex: 1, padding: '28px 36px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (unauthorized) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+          <div style={{ fontSize: 48 }}>🚫</div>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>Access Denied</div>
+          <div style={{ fontSize: 14, color: colors.textDim }}>Only the admin can access this page.</div>
+          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: colors.blue, fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      <aside style={{ width: 240, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '0 10px', marginBottom: 24 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Admin Panel</div>
-          <div style={{ fontSize: 12, color: colors.textDim }}>{user.email}</div>
+      <aside style={{ width: 200, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#222' }} />
+          <span style={{ fontSize: 14, fontWeight: 600 }}>Modrinth</span>
         </div>
-
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', padding: '8px 14px', marginBottom: 4 }}>Dashboard</div>
-          <NavItem icon="📊" label="Overview" active={page === 'overview'} onClick={() => setPage('overview')} />
-
-          <div style={{ fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', padding: '8px 14px', marginTop: 12, marginBottom: 4 }}>Users</div>
-          <NavItem icon="👥" label="All Users" active={page === 'users'} onClick={() => setPage('users')} />
-          <NavItem icon="🚫" label="Banned" active={page === 'banned'} onClick={() => setPage('banned')} />
-          <NavItem icon="⏸️" label="Suspended" active={page === 'suspended'} onClick={() => setPage('suspended')} />
-
-          <div style={{ fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', padding: '8px 14px', marginTop: 12, marginBottom: 4 }}>Endpoints</div>
-          <NavItem icon="🔗" label="All Endpoints" active={page === 'endpoints'} onClick={() => setPage('endpoints')} />
-          <NavItem icon="➕" label="Create Endpoint" active={page === 'create-endpoint'} onClick={() => setPage('create-endpoint')} />
-
-          <div style={{ fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', padding: '8px 14px', marginTop: 12, marginBottom: 4 }}>Security</div>
-          <NavItem icon="📋" label="Audit Logs" active={page === 'audit'} onClick={() => setPage('audit')} />
-          <NavItem icon="🛡️" label="Security Events" active={page === 'security'} onClick={() => setPage('security')} />
+          <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
+          <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
+          <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
+          <NavItem icon="👥" label="Admin" active onClick={() => router.push('/admin')} />
+          <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
         </div>
-
         <div>
-          <NavItem icon="🚪" label="Logout" onClick={() => window.location.href = '/api/auth/logout'} />
+          <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
         </div>
       </aside>
 
-      <main style={{ flex: 1, overflow: 'auto' }}>
-        {page === 'overview' && <Overview stats={stats} />}
-        {page === 'users' && <UsersPage />}
-        {page === 'banned' && <UsersPage />}
-        {page === 'suspended' && <UsersPage />}
-      </main>
+      <div style={{ flex: 1, padding: '28px 36px', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>Admin Panel</div>
+            <div style={{ fontSize: 13, color: colors.textDim, marginTop: 4 }}>Manage user access and pro licenses</div>
+          </div>
+          <div style={{ background: '#1a2a1a', color: colors.green, fontSize: 12, padding: '6px 12px', borderRadius: 6, fontWeight: 600 }}>
+            {users.length} users
+          </div>
+        </div>
+
+        <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 100px', padding: '12px 20px', borderBottom: `1px solid ${colors.border}`, fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase' }}>
+            <div>Email</div>
+            <div>Joined</div>
+            <div>Last Login</div>
+            <div style={{ textAlign: 'center' }}>Pro</div>
+          </div>
+
+          {users.map((u) => (
+            <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 100px', padding: '14px 20px', borderBottom: `1px solid ${colors.border}`, fontSize: 13, alignItems: 'center' }}>
+              <div>
+                <div style={{ color: colors.text, fontWeight: 500 }}>{u.email}</div>
+                {u.display_name && u.display_name !== u.email && (
+                  <div style={{ color: colors.textDim, fontSize: 12, marginTop: 2 }}>{u.display_name}</div>
+                )}
+              </div>
+              <div style={{ color: colors.textDim, fontSize: 12 }}>
+                {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
+              </div>
+              <div style={{ color: colors.textDim, fontSize: 12 }}>
+                {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : 'Never'}
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div
+                  onClick={() => togglePro(u.email, u.is_pro)}
+                  style={{
+                    cursor: toggling === u.email ? 'wait' : 'pointer',
+                    width: 44, height: 24, borderRadius: 12, padding: 2,
+                    background: u.is_pro ? colors.green : '#333',
+                    transition: 'background 0.2s',
+                    opacity: toggling === u.email ? 0.5 : 1,
+                    display: 'inline-block',
+                  }}
+                >
+                  <div style={{
+                    width: 20, height: 20, borderRadius: 10, background: '#fff',
+                    transform: u.is_pro ? 'translateX(20px)' : 'translateX(0)',
+                    transition: 'transform 0.2s',
+                  }} />
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {users.length === 0 && (
+            <div style={{ padding: 40, textAlign: 'center', color: colors.textDim, fontSize: 14 }}>
+              No users found.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

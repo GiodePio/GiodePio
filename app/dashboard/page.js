@@ -314,17 +314,59 @@ function LiveCaptures() {
 export default function DashboardPage() {
   const [page, setPage] = useState('dashboard');
   const [user, setUser] = useState(null);
+  const [isPro, setIsPro] = useState(false);
+  const [proChecked, setProChecked] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     fetch('/api/auth/user')
       .then(r => r.json())
-      .then(d => { if (d.user) setUser(d.user); })
-      .catch(() => {});
+      .then(d => {
+        if (d.user) {
+          setUser(d.user);
+          if (d.user.email === 'lifegrading@gmail.com') {
+            setIsPro(true);
+            setProChecked(true);
+          } else {
+            fetch('/api/user/pro')
+              .then(r => r.json())
+              .then(p => { setIsPro(p.is_pro); setProChecked(true); })
+              .catch(() => { setIsPro(false); setProChecked(true); });
+          }
+        } else {
+          setProChecked(true);
+        }
+      })
+      .catch(() => setProChecked(true));
   }, []);
 
   const username = user?.name || 'You';
   const userEmail = user?.email || '';
+
+  if (!proChecked) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isPro && userEmail !== 'lifegrading@gmail.com') {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+          <div style={{ fontSize: 48 }}>🔒</div>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>Pro Required</div>
+          <div style={{ fontSize: 14, color: colors.textDim, textAlign: 'center', maxWidth: 400 }}>
+            You need a Pro license to access the dashboard. Contact the admin to get access.
+          </div>
+          <div onClick={() => window.location.href = '/api/auth/logout'} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 14, marginTop: 8 }}>
+            Log out
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -337,6 +379,9 @@ export default function DashboardPage() {
           <NavItem icon="📊" label="Dashboard" active={page === 'dashboard'} onClick={() => setPage('dashboard')} />
           <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
           <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
+          {userEmail === 'lifegrading@gmail.com' && (
+            <NavItem icon="👥" label="Admin" onClick={() => router.push('/admin')} />
+          )}
           <NavItem icon="📋" label="Plans" active={page === 'plans'} onClick={() => setPage('plans')} />
           <NavItem icon="⭐" label="+Rep" active={page === 'rep'} onClick={() => setPage('rep')} />
           <NavItem icon="📡" label="Live Captures" active={page === 'live'} onClick={() => setPage('live')} />

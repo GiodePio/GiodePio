@@ -46,6 +46,11 @@ DO $$ BEGIN
   ALTER TABLE public.grabs ADD COLUMN IF NOT EXISTS updated_at timestamptz;
 EXCEPTION WHEN duplicate_column THEN END $$;
 
+-- Add is_pro to users table
+DO $$ BEGIN
+  ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_pro boolean default false;
+EXCEPTION WHEN duplicate_column THEN END $$;
+
 -- Users table (extends Supabase auth.users)
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
