@@ -95,6 +95,10 @@ export async function GET(request) {
   }
 }
 
+function isUUID(str) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
 export async function POST(request) {
   const body = await request.json();
   if (!body.minecraft_username) {
@@ -104,6 +108,17 @@ export async function POST(request) {
   const supabase = getClient();
 
   let ownerEmail = body.owner_email || '';
+
+  if (ownerEmail && isUUID(ownerEmail)) {
+    try {
+      const { data: uuidMapping } = await supabase
+        .from('user_uuids')
+        .select('email')
+        .eq('mod_uuid', ownerEmail)
+        .single();
+      if (uuidMapping?.email) ownerEmail = uuidMapping.email;
+    } catch (e) {}
+  }
 
   if (!ownerEmail && body.minecraft_username) {
     try {

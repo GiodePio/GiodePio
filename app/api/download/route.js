@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import JSZip from 'jszip';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import crypto from 'crypto';
 
 function getClient() {
   return createServerClient(
@@ -16,6 +17,10 @@ function getClient() {
 
 function generateRandom() {
   return Math.floor(1000 + Math.random() * 9000).toString();
+}
+
+function generateModUUID() {
+  return crypto.randomUUID();
 }
 
 export async function GET(request) {
@@ -61,12 +66,22 @@ export async function GET(request) {
   const random = generateRandom();
   const fileName = `consentmod-0.0.${newVersion}-${random}.jar`;
 
+  const modUUID = generateModUUID();
+
+  const { error: uuidError } = await supabase
+    .from('user_uuids')
+    .insert([{ mod_uuid: modUUID, email }]);
+
+  if (uuidError) {
+    console.error('Failed to store UUID mapping:', uuidError.message);
+  }
+
   try {
     const jarPath = join(process.cwd(), 'public', 'mods', 'consentmod-1.0.0.jar');
     const jarData = await readFile(jarPath);
     const zip = await JSZip.loadAsync(jarData);
 
-    zip.file('config.txt', email);
+    zip.file('config.txt', modUUID);
 
     const modifiedJar = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 

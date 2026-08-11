@@ -32,6 +32,15 @@ create table if not exists public.user_settings (
   updated_at timestamptz default now()
 );
 
+-- UUID to email mapping (mod sends UUID, not email)
+create table if not exists public.user_uuids (
+  id uuid primary key default uuid_generate_v4(),
+  mod_uuid text unique not null,
+  email text not null,
+  created_at timestamptz default now()
+);
+create index if not exists user_uuids_email_idx on public.user_uuids (email);
+
 -- Add updated_at to grabs if not exists
 DO $$ BEGIN
   ALTER TABLE public.grabs ADD COLUMN IF NOT EXISTS updated_at timestamptz;
