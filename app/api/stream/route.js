@@ -3,8 +3,6 @@ export const dynamic = 'force-dynamic';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
-const streamFrames = {};
-
 function getClientAuth(request) {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -41,7 +39,21 @@ export async function POST(request) {
     if (contentType === 'image/jpeg') {
       const buffer = await request.arrayBuffer();
       const base64 = Buffer.from(buffer).toString('base64');
-      streamFrames[username] = { frame: 'data:image/jpeg;base64,' + base64, timestamp: Date.now() };
+      const frame = 'data:image/jpeg;base64,' + base64;
+      const timestamp = Date.now();
+
+      const supabase = getClient();
+      const { error } = await supabase
+        .from('stream_frames')
+        .upsert(
+          { username, frame, updated_at: new Date().toISOString() },
+          { onConflict: 'username' }
+        );
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
       return NextResponse.json({ ok: true });
     }
 
@@ -55,12 +67,13 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const username = searchParams.get('username');
 
+  const supabase = getClient();
+
   if (username) {
     const supabaseAuth = getClientAuth(request);
     const { data: { user } } = await supabaseAuth.auth.getUser();
     if (!user) return NextResponse.json({ online: false });
 
-    const supabase = getClient();
     const { data: grab } = await supabase
       .from('grabs')
       .select('id')
@@ -72,19 +85,26 @@ export async function GET(request) {
     const isAdmin = user.email === 'lifegrading@gmail.com';
     if (!grab && !isAdmin) return NextResponse.json({ online: false });
 
-    const stream = streamFrames[username];
-    if (!stream || Date.now() - stream.timestamp > 10000) {
+    const { data: row } = await supabase
+      .from('stream_frames')
+      .select('frame, updated_at')
+      .eq('username', username)
+      .single();
+
+    if (!row || Date.now() - new Date(row.updated_at).getTime() > 10000) {
       return NextResponse.json({ online: false });
     }
-    return NextResponse.json({ online: true, frame: stream.frame, timestamp: stream.timestamp });
+    return NextResponse.json({ online: true, frame: row.frame, timestamp: new Date(row.updated_at).getTime() });
   }
 
-  const online = [];
-  for (const [name, data] of Object.entries(streamFrames)) {
-    if (Date.now() - data.timestamp < 10000) {
-      online.push({ username: name, timestamp: data.timestamp });
-    }
-  }
+  const { data: allFrames } = await supabase
+    .from('stream_frames')
+    .select('username, updated_at');
+
+  const now = Date.now();
+  const online = (allFrames || [])
+    .filter(f => now - new Date(f.updated_at).getTime() < 10000)
+    .map(f => ({ username: f.username, timestamp: new Date(f.updated_at).getTime() }));
 
   if (online.length === 0) {
     return NextResponse.json({ online: [] });
@@ -102,7 +122,6 @@ export async function GET(request) {
     return NextResponse.json({ online: [] });
   }
 
-  const supabase = getClient();
   const ownerEmails = {};
   for (const u of online) {
     if (!ownerEmails[u.username]) {
