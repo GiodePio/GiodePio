@@ -28,12 +28,6 @@ function NavItem({ icon, label, active, onClick }) {
     </div>
   );
 }
-    }}>
-      <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{icon}</span>
-      <span>{label}</span>
-    </div>
-  );
-}
 
 function GrabSection({ title, icon, children }) {
   return (
