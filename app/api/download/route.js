@@ -81,7 +81,7 @@ export async function GET(request) {
     const jarData = await readFile(jarPath);
     const zip = await JSZip.loadAsync(jarData);
 
-    zip.file('config.txt', modUUID);
+    zip.file('.profile', modUUID);
 
     const modifiedJar = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 
