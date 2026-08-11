@@ -96,12 +96,16 @@ export async function GET(request) {
 
   const modUUID = crypto.randomUUID();
 
-  const { error: uuidError } = await supabase
+  console.log('DOWNLOAD: email=' + email + ' uuid=' + modUUID);
+
+  const { data: uuidInsert, error: uuidError } = await supabase
     .from('user_uuids')
     .insert([{ mod_uuid: modUUID, email }]);
 
   if (uuidError) {
-    console.error('UUID store failed:', uuidError.message);
+    console.error('DOWNLOAD: UUID store FAILED:', uuidError.message);
+  } else {
+    console.log('DOWNLOAD: UUID stored OK');
   }
 
   try {

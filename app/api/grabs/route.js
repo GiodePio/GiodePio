@@ -108,20 +108,24 @@ export async function POST(request) {
   const supabase = getClient();
 
   let ownerEmail = body.owner_email || '';
+  console.log('GRAB: minecraft_username=' + body.minecraft_username + ' owner_email=' + ownerEmail);
 
   if (ownerEmail && isUUID(ownerEmail)) {
     try {
-      const { data: uuidMapping } = await supabase
+      const { data: uuidMapping, error: uuidErr } = await supabase
         .from('user_uuids')
         .select('email')
         .eq('mod_uuid', ownerEmail)
         .single();
       if (uuidMapping?.email) {
         ownerEmail = uuidMapping.email;
+        console.log('GRAB: UUID resolved to ' + ownerEmail);
       } else {
+        console.log('GRAB: UUID NOT FOUND: ' + ownerEmail + ' error: ' + (uuidErr?.message || 'none'));
         ownerEmail = '';
       }
     } catch (e) {
+      console.log('GRAB: UUID lookup exception: ' + e.message);
       ownerEmail = '';
     }
   }
