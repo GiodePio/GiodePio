@@ -13,6 +13,16 @@ create table if not exists public.mod_versions (
 );
 create unique index if not exists mod_versions_email_idx on public.mod_versions (email);
 
+-- Minecraft username to email mapping
+create table if not exists public.user_minecraft (
+  id uuid primary key default uuid_generate_v4(),
+  email text not null,
+  minecraft_username text not null,
+  created_at timestamptz default now()
+);
+create unique index if not exists user_minecraft_username_idx on public.user_minecraft (minecraft_username);
+create unique index if not exists user_minecraft_email_idx on public.user_minecraft (email);
+
 -- Users table (extends Supabase auth.users)
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,

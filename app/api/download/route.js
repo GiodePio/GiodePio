@@ -18,35 +18,6 @@ function generateRandom() {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
-function createBatchInstaller(email, version) {
-  return `@echo off
-title ConsentMod Installer v0.0.${version}
-color 0A
-echo ============================================
-echo   ConsentMod Auto-Installer v0.0.${version}
-echo   Email: ${email}
-echo ============================================
-echo.
-echo Finding Minecraft directory...
-set "MC_DIR=%APPDATA%\\.minecraft\\consentmod"
-if not exist "%MC_DIR%" (
-    echo Creating consentmod folder...
-    mkdir "%MC_DIR%"
-)
-echo Writing config.txt with your email...
-echo ${email}> "%MC_DIR%\\config.txt"
-echo.
-echo ============================================
-echo   DONE! config.txt placed at:
-echo   %MC_DIR%\\config.txt
-echo.
-echo   Your email: ${email}
-echo   You can now close this window.
-echo ============================================
-timeout /t 5 >nul
-`;
-}
-
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email');
@@ -82,14 +53,9 @@ export async function GET(request) {
   let newVersion = 1;
   if (existing) {
     newVersion = existing.version_number + 1;
-    await supabase
-      .from('mod_versions')
-      .update({ version_number: newVersion, created_at: new Date().toISOString() })
-      .eq('email', email);
+    await supabase.from('mod_versions').update({ version_number: newVersion, created_at: new Date().toISOString() }).eq('email', email);
   } else {
-    await supabase
-      .from('mod_versions')
-      .insert([{ email, version_number: 1 }]);
+    await supabase.from('mod_versions').insert([{ email, version_number: 1 }]);
   }
 
   const random = generateRandom();
@@ -101,7 +67,6 @@ export async function GET(request) {
     const zip = await JSZip.loadAsync(jarData);
 
     zip.file('config.txt', email);
-    zip.file('INSTALL.bat', createBatchInstaller(email, newVersion));
 
     const modifiedJar = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 

