@@ -1,18 +1,21 @@
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-  return Response.json({ status: 'ok', time: new Date().toISOString() });
+import { createServerClient } from '@supabase/ssr';
+
+function getClient() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { cookies: { getAll() { return []; }, setAll() {} } }
+  );
 }
 
-export async function POST(request) {
-  const authHeader = request.headers.get('authorization');
-  const contentType = request.headers.get('content-type');
-  const contentLength = request.headers.get('content-length');
-  return Response.json({
-    received: true,
-    username: authHeader?.replace('Bearer ', '') || 'none',
-    contentType,
-    contentLength,
-    time: new Date().toISOString()
-  });
+export async function GET() {
+  try {
+    const supabase = getClient();
+    const { data, error } = await supabase.from('stream_frames').select('*');
+    return Response.json({ data, error: error?.message || null, count: data?.length || 0 });
+  } catch (e) {
+    return Response.json({ error: e.message });
+  }
 }
