@@ -52,13 +52,6 @@ function patchClassWithUUID(classBuffer, uuid) {
 }
 
 export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const email = searchParams.get('email');
-
-  if (!email || !email.includes('@')) {
-    return NextResponse.json({ error: 'Valid email required' }, { status: 400 });
-  }
-
   const supabaseAuth = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -74,6 +67,8 @@ export async function GET(request) {
 
   const { data: { user } } = await supabaseAuth.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const email = user.email;
 
   const supabase = getClient();
 
