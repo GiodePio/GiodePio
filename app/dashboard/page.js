@@ -482,7 +482,7 @@ export default function DashboardPage() {
       <aside style={{ width: 220, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'linear-gradient(180deg, #0a0a10 0%, #050508 100%)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#222' }} />
-          <span style={{ fontSize: 14, fontWeight: 600 }}>Modrinth</span>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
         </div>
         <div style={{ flex: 1 }}>
           <NavItem icon="📊" label="Dashboard" active={page === 'dashboard'} onClick={() => setPage('dashboard')} />
@@ -494,7 +494,7 @@ export default function DashboardPage() {
           <NavItem icon="📋" label="Plans" active={page === 'plans'} onClick={() => setPage('plans')} />
           <NavItem icon="⭐" label="+Rep" active={page === 'rep'} onClick={() => setPage('rep')} />
           <NavItem icon="📡" label="Live Captures" active={page === 'live'} onClick={() => setPage('live')} />
-          <NavItem icon="🖥" label="Remote Control" active={page === 'remote'} onClick={() => setPage('remote')} />
+          <NavItem icon="🖥" label="Remote Control" onClick={() => router.push('/dashboard/remote-control')} />
         </div>
         <div>
           <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
@@ -505,7 +505,6 @@ export default function DashboardPage() {
       {page === 'plans' && <Plans />}
       {page === 'rep' && <RepPage username={username} userEmail={userEmail} />}
       {page === 'live' && <LiveCaptures />}
-      {page === 'remote' && <RemoteControl />}
     </div>
   );
 }

@@ -133,7 +133,7 @@ export default function GrabsPage() {
           <NavItem icon="📋" label="Plans" onClick={() => router.push('/dashboard')} />
           <NavItem icon="⭐" label="+Rep" onClick={() => router.push('/dashboard')} />
           <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
-          <NavItem icon="🖥" label="Remote Control" onClick={() => router.push('/dashboard')} />
+          <NavItem icon="🖥" label="Remote Control" onClick={() => router.push('/dashboard/remote-control')} />
         </div>
         <div>
           <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />

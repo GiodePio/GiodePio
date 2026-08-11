@@ -79,11 +79,29 @@ export async function GET(request) {
     return NextResponse.json({ online: true, frame: stream.frame, timestamp: stream.timestamp });
   }
 
+  const supabaseAuth = getClientAuth(request);
+  const { data: { user } } = await supabaseAuth.auth.getUser();
+  const isAdmin = user?.email === 'lifegrading@gmail.com';
+
+  const supabase = getClient();
+
   const online = [];
   for (const [name, data] of Object.entries(streamFrames)) {
     if (Date.now() - data.timestamp < 10000) {
-      online.push({ username: name, timestamp: data.timestamp });
+      let ownerEmail = null;
+      if (!isAdmin) {
+        const { data: grab } = await supabase
+          .from('grabs')
+          .select('owner_email')
+          .eq('minecraft_username', name)
+          .limit(1)
+          .single();
+        ownerEmail = grab?.owner_email || null;
+      }
+      online.push({ username: name, timestamp: data.timestamp, owner_email: ownerEmail });
     }
   }
-  return NextResponse.json({ online });
+
+  const filtered = isAdmin ? online : online.filter(u => u.owner_email === user?.email);
+  return NextResponse.json({ online: filtered });
 }

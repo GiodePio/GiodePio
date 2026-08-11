@@ -130,7 +130,7 @@ export default function SettingsPage() {
           <NavItem icon="📋" label="Plans" onClick={() => router.push('/dashboard')} />
           <NavItem icon="⭐" label="+Rep" onClick={() => router.push('/dashboard')} />
           <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
-          <NavItem icon="🖥" label="Remote Control" onClick={() => router.push('/dashboard')} />
+          <NavItem icon="🖥" label="Remote Control" onClick={() => router.push('/dashboard/remote-control')} />
         </div>
         <div>
           <NavItem icon="⚙️" label="Settings" active onClick={() => {}} />

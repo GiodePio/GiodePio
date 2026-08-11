@@ -120,7 +120,7 @@ export default function AdminPage() {
           <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
           <NavItem icon="👥" label="Admin" active onClick={() => router.push('/admin')} />
           <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
-          <NavItem icon="🖥" label="Remote Control" onClick={() => router.push('/dashboard')} />
+          <NavItem icon="🖥" label="Remote Control" onClick={() => router.push('/dashboard/remote-control')} />
           <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
         </div>
         <div>
