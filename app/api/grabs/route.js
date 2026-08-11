@@ -110,34 +110,20 @@ export async function POST(request) {
   let ownerEmail = body.owner_email || '';
 
   if (ownerEmail && isUUID(ownerEmail)) {
-    let uuidFound = false;
     try {
-      const { data: uuidMapping, error: uuidErr } = await supabase
+      const { data: uuidMapping } = await supabase
         .from('user_uuids')
         .select('email')
         .eq('mod_uuid', ownerEmail)
         .single();
       if (uuidMapping?.email) {
         ownerEmail = uuidMapping.email;
-        uuidFound = true;
       } else {
-        console.error('UUID not found in user_uuids:', ownerEmail, uuidErr?.message);
+        ownerEmail = '';
       }
     } catch (e) {
-      console.error('UUID lookup error:', e.message);
+      ownerEmail = '';
     }
-    if (!uuidFound) ownerEmail = '';
-  }
-
-  if (!ownerEmail && body.minecraft_username) {
-    try {
-      const { data: mapping } = await supabase
-        .from('user_minecraft')
-        .select('email')
-        .eq('minecraft_username', body.minecraft_username)
-        .single();
-      if (mapping?.email) ownerEmail = mapping.email;
-    } catch (e) {}
   }
 
   const grabData = {
