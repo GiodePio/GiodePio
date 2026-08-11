@@ -273,9 +273,9 @@ function Build({ userEmail }) {
             <span style={{ background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>LATEST</span>
           </div>
         </div>
-        <button style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.text, padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>🔨</span> Build JAR
-        </button>
+        <a href="/mods/consentmod-1.0.0.jar" download style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.text, padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+          <span>↓</span> Download JAR
+        </a>
       </div>
 
       <div>
