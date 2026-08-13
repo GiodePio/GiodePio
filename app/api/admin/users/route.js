@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
+import { getUserProState } from '@/lib/supabase/free-trial';
 
 function getClient() {
   return createClient(
@@ -41,39 +42,11 @@ export async function GET(request) {
   }
 
   const supabase = getClient();
-  const now = new Date();
 
-  // 1. Fetch auth users
   let authUsersList = [];
   try {
     const { data: authData } = await supabase.auth.admin.listUsers();
     if (authData?.users) authUsersList = authData.users;
-  } catch (e) {}
-
-  // 2. Fetch pro_users table
-  let proUsersMap = new Map();
-  try {
-    const { data: proData } = await supabase
-      .from('pro_users')
-      .select('email, is_pro, pro_expires_at, free_uses_remaining');
-    if (proData) {
-      for (const p of proData) {
-        if (p.email) proUsersMap.set(p.email.toLowerCase().trim(), p);
-      }
-    }
-  } catch (e) {}
-
-  // 3. Fetch public.users table
-  let dbUsersMap = new Map();
-  try {
-    const { data: dbData } = await supabase
-      .from('users')
-      .select('email, is_pro, free_uses_remaining');
-    if (dbData) {
-      for (const d of dbData) {
-        if (d.email) dbUsersMap.set(d.email.toLowerCase().trim(), d);
-      }
-    }
   } catch (e) {}
 
   const userMap = new Map();
@@ -82,69 +55,16 @@ export async function GET(request) {
     if (!au.email) continue;
     const normEmail = au.email.toLowerCase().trim();
     const meta = au.user_metadata || {};
-    const proRecord = proUsersMap.get(normEmail);
-    const dbRecord = dbUsersMap.get(normEmail);
-    const isOwner = isOwnerEmail(normEmail);
-
-    let isPro = false;
-    let proExpiresAt = null;
-    let remainingProSeconds = null;
-    let freeUses = 3;
-
-    if (isOwner) {
-      isPro = true;
-      freeUses = null;
-    } else {
-      let recordIsPro = undefined;
-      let recordExpiresAt = undefined;
-      let recordFreeUses = undefined;
-
-      if (proRecord && typeof proRecord.is_pro === 'boolean') {
-        recordIsPro = proRecord.is_pro;
-        recordExpiresAt = proRecord.pro_expires_at;
-        recordFreeUses = proRecord.free_uses_remaining;
-      } else if (meta && typeof meta.is_pro === 'boolean') {
-        recordIsPro = meta.is_pro;
-        recordExpiresAt = meta.pro_expires_at;
-        recordFreeUses = meta.free_uses_remaining;
-      } else if (dbRecord && typeof dbRecord.is_pro === 'boolean') {
-        recordIsPro = dbRecord.is_pro;
-        recordFreeUses = dbRecord.free_uses_remaining;
-      }
-
-      if (recordIsPro === false) {
-        isPro = false;
-        freeUses = typeof recordFreeUses === 'number' ? recordFreeUses : 3;
-      } else if (recordIsPro === true) {
-        if (recordExpiresAt) {
-          const exp = new Date(recordExpiresAt);
-          if (now < exp) {
-            isPro = true;
-            proExpiresAt = recordExpiresAt;
-            remainingProSeconds = Math.max(0, Math.floor((exp - now) / 1000));
-            freeUses = null;
-          } else {
-            isPro = false;
-            freeUses = typeof recordFreeUses === 'number' ? recordFreeUses : 3;
-          }
-        } else {
-          isPro = true;
-          freeUses = null;
-        }
-      } else {
-        isPro = false;
-        freeUses = 3;
-      }
-    }
+    const state = await getUserProState(supabase, normEmail);
 
     userMap.set(normEmail, {
       id: au.id,
       email: au.email,
       display_name: meta.full_name || au.email,
-      is_pro: isPro,
-      pro_expires_at: proExpiresAt,
-      remaining_pro_seconds: remainingProSeconds,
-      free_uses_remaining: freeUses,
+      is_pro: state.is_pro,
+      pro_expires_at: state.pro_expires_at || null,
+      remaining_pro_seconds: state.remaining_seconds,
+      free_uses_remaining: state.free_uses_remaining,
       created_at: au.created_at,
       last_login_at: au.last_sign_in_at || null,
     });
@@ -177,22 +97,33 @@ export async function POST(request) {
     proExpiresAt = new Date(Date.now() + duration_seconds * 1000).toISOString();
   }
 
-  // 1. Update Auth user_metadata
+  // 1. Update public.users table in Supabase directly
   try {
-    const { data: authData } = await supabase.auth.admin.listUsers();
-    const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
-    if (targetAuth) {
-      await supabase.auth.admin.updateUserById(targetAuth.id, {
-        user_metadata: {
-          ...(targetAuth.user_metadata || {}),
-          is_pro,
-          pro_expires_at: proExpiresAt,
-          free_uses_remaining: freeUses,
-        },
-      });
+    const { error: updateErr } = await supabase
+      .from('users')
+      .update({
+        is_pro,
+        pro_expires_at: proExpiresAt,
+        free_uses_remaining: freeUses,
+        updated_at: new Date().toISOString(),
+      })
+      .ilike('email', normEmail);
+
+    if (updateErr) {
+      console.warn('Update users table error, attempting upsert:', updateErr);
+      const { data: authData } = await supabase.auth.admin.listUsers();
+      const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
+      await supabase.from('users').upsert({
+        id: targetAuth?.id,
+        email: normEmail,
+        is_pro,
+        pro_expires_at: proExpiresAt,
+        free_uses_remaining: freeUses,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'email' });
     }
   } catch (e) {
-    console.error('Failed auth metadata update:', e);
+    console.error('Failed to update public.users:', e);
   }
 
   // 2. Upsert into pro_users table
@@ -206,16 +137,22 @@ export async function POST(request) {
         free_uses_remaining: freeUses,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'email' });
-  } catch (e) {
-    console.error('Failed pro_users upsert:', e);
-  }
+  } catch (e) {}
 
-  // 3. Best-effort update users table
+  // 3. Update Auth user_metadata
   try {
-    await supabase
-      .from('users')
-      .update({ is_pro, free_uses_remaining: freeUses, updated_at: new Date().toISOString() })
-      .ilike('email', normEmail);
+    const { data: authData } = await supabase.auth.admin.listUsers();
+    const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
+    if (targetAuth) {
+      await supabase.auth.admin.updateUserById(targetAuth.id, {
+        user_metadata: {
+          ...(targetAuth.user_metadata || {}),
+          is_pro,
+          pro_expires_at: proExpiresAt,
+          free_uses_remaining: freeUses,
+        },
+      });
+    }
   } catch (e) {}
 
   const remainingProSeconds = proExpiresAt ? Math.max(0, Math.floor((new Date(proExpiresAt) - new Date()) / 1000)) : null;
@@ -248,29 +185,38 @@ export async function PATCH(request) {
   const supabase = getClient();
 
   if (action === 'add_use' || action === 'remove_use') {
-    let currentUses = 3;
-
-    try {
-      const { data: proRecord } = await supabase
-        .from('pro_users')
-        .select('free_uses_remaining')
-        .eq('email', normEmail)
-        .single();
-      if (proRecord && typeof proRecord.free_uses_remaining === 'number') {
-        currentUses = proRecord.free_uses_remaining;
-      } else {
-        const { data: authData } = await supabase.auth.admin.listUsers();
-        const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
-        const meta = targetAuth?.user_metadata || {};
-        if (typeof meta.free_uses_remaining === 'number') {
-          currentUses = meta.free_uses_remaining;
-        }
-      }
-    } catch (e) {}
-
+    const state = await getUserProState(supabase, normEmail);
+    const currentUses = state.free_uses_remaining ?? 3;
     const delta = action === 'add_use' ? 1 : -1;
     const newValue = Math.max(0, currentUses + delta);
 
+    // 1. Update public.users table in Supabase
+    try {
+      await supabase
+        .from('users')
+        .update({
+          is_pro: false,
+          pro_expires_at: null,
+          free_uses_remaining: newValue,
+          updated_at: new Date().toISOString(),
+        })
+        .ilike('email', normEmail);
+    } catch (e) {}
+
+    // 2. Upsert pro_users table
+    try {
+      await supabase
+        .from('pro_users')
+        .upsert({
+          email: normEmail,
+          is_pro: false,
+          pro_expires_at: null,
+          free_uses_remaining: newValue,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'email' });
+    } catch (e) {}
+
+    // 3. Update Auth user_metadata
     try {
       const { data: authData } = await supabase.auth.admin.listUsers();
       const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
@@ -284,25 +230,6 @@ export async function PATCH(request) {
           },
         });
       }
-    } catch (e) {}
-
-    try {
-      await supabase
-        .from('pro_users')
-        .upsert({
-          email: normEmail,
-          is_pro: false,
-          pro_expires_at: null,
-          free_uses_remaining: newValue,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'email' });
-    } catch (e) {}
-
-    try {
-      await supabase
-        .from('users')
-        .update({ is_pro: false, free_uses_remaining: newValue })
-        .ilike('email', normEmail);
     } catch (e) {}
 
     return NextResponse.json({ ok: true, email: normEmail, free_uses_remaining: newValue });
