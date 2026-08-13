@@ -36,49 +36,62 @@ export async function GET(request) {
 
   const supabase = getClient();
 
-  const { data: users, error } = await supabase
-    .from('users')
-    .select('id, email, display_name, is_pro, free_uses_remaining, created_at, last_login_at')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    const { data: usersBasic, error: errorBasic } = await supabase
-      .from('users')
-      .select('id, email, display_name, created_at')
-      .order('created_at', { ascending: false });
-    if (errorBasic) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+  let authUsersMap = {};
+  try {
+    const { data: authData } = await supabase.auth.admin.listUsers();
+    if (authData?.users) {
+      for (const u of authData.users) {
+        if (u.email) authUsersMap[u.email] = u;
+      }
     }
-    const mapped = (usersBasic || []).map(u => ({
-      id: u.id,
-      email: u.email,
-      display_name: u.display_name || null,
-      is_pro: u.email === 'lifegrading@gmail.com',
-      free_uses_remaining: u.email === 'lifegrading@gmail.com' ? null : 3,
-      created_at: u.created_at,
-      last_login_at: null,
-    }));
-    return NextResponse.json({ users: mapped, columns_missing: true });
-  }
+  } catch (e) {}
+
+  let users = null;
+  try {
+    const { data } = await supabase
+      .from('users')
+      .select('id, email, display_name, is_pro, free_uses_remaining, created_at, last_login_at')
+      .order('created_at', { ascending: false });
+    users = data;
+  } catch (e) {}
 
   if (!users || users.length === 0) {
-    const { data: authUsers, error: authError } = await supabase
-      .from('users')
-      .select('id, email, created_at');
-    if (authError) return NextResponse.json({ users: [] });
-    const mapped = (authUsers || []).map(u => ({
-      id: u.id,
-      email: u.email,
-      display_name: null,
-      is_pro: u.email === 'lifegrading@gmail.com',
-      free_uses_remaining: u.email === 'lifegrading@gmail.com' ? null : 3,
-      created_at: u.created_at,
-      last_login_at: null,
-    }));
-    return NextResponse.json({ users: mapped, fallback: true });
+    const emailList = Object.keys(authUsersMap);
+    const mapped = emailList.map(email => {
+      const u = authUsersMap[email];
+      const meta = u.user_metadata || {};
+      const isOwner = email === 'lifegrading@gmail.com';
+      const isPro = isOwner || meta.is_pro === true;
+      const freeUses = isPro ? null : (meta.free_uses_remaining ?? 3);
+      return {
+        id: u.id,
+        email: u.email,
+        display_name: meta.full_name || u.email,
+        is_pro: isPro,
+        free_uses_remaining: freeUses,
+        created_at: u.created_at,
+        last_login_at: u.last_sign_in_at || null,
+      };
+    });
+    return NextResponse.json({ users: mapped });
   }
 
-  return NextResponse.json({ users: users || [] });
+  const mapped = users.map(u => {
+    const authUser = authUsersMap[u.email];
+    const meta = authUser?.user_metadata || {};
+    const isOwner = u.email === 'lifegrading@gmail.com';
+    const isPro = isOwner || u.is_pro === true || meta.is_pro === true;
+    const freeUses = isPro ? null : (u.free_uses_remaining ?? meta.free_uses_remaining ?? 3);
+
+    return {
+      ...u,
+      display_name: u.display_name || meta.full_name || u.email,
+      is_pro: isPro,
+      free_uses_remaining: freeUses,
+    };
+  });
+
+  return NextResponse.json({ users: mapped });
 }
 
 export async function POST(request) {
@@ -97,52 +110,36 @@ export async function POST(request) {
 
   const supabase = getClient();
 
-  // Try updating all fields (is_pro, free_uses_remaining, updated_at)
-  let { error } = await supabase
-    .from('users')
-    .update({
-      is_pro,
-      free_uses_remaining: is_pro ? null : 3,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('email', email);
-
-  // Fallback 1: If free_uses_remaining or updated_at column missing, try updating only is_pro
-  if (error && (error.message?.includes('free_uses_remaining') || error.message?.includes('updated_at') || error.message?.includes('schema cache'))) {
-    const fallback = await supabase
-      .from('users')
-      .update({ is_pro })
-      .eq('email', email);
-    error = fallback.error;
-  }
-
-  // Fallback 2: If user row does not exist in public.users, upsert it
-  if (!error) {
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single();
-
-    if (!existingUser) {
-      try {
-        const { data: authData } = await supabase.auth.admin.listUsers();
-        const authUser = authData?.users?.find(u => u.email === email);
-        if (authUser) {
-          await supabase.from('users').upsert([{
-            id: authUser.id,
-            email: authUser.email,
-            is_pro,
-            free_uses_remaining: is_pro ? null : 3,
-            display_name: authUser.user_metadata?.full_name || authUser.email,
-          }]);
-        }
-      } catch (e) {}
+  // 1. Always update Auth user_metadata
+  try {
+    const { data: authData } = await supabase.auth.admin.listUsers();
+    const targetAuth = authData?.users?.find(u => u.email === email);
+    if (targetAuth) {
+      await supabase.auth.admin.updateUserById(targetAuth.id, {
+        user_metadata: {
+          ...targetAuth.user_metadata,
+          is_pro,
+          free_uses_remaining: is_pro ? null : 3,
+        },
+      });
     }
+  } catch (e) {
+    console.error('Failed to update auth metadata:', e);
   }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  // 2. Best-effort update DB users table
+  try {
+    await supabase
+      .from('users')
+      .update({
+        is_pro,
+        free_uses_remaining: is_pro ? null : 3,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('email', email);
+  } catch (e) {}
+
+  return NextResponse.json({ ok: true, is_pro, free_uses_remaining: is_pro ? null : 3 });
 }
 
 export async function PATCH(request) {
@@ -162,34 +159,49 @@ export async function PATCH(request) {
   const supabase = getClient();
 
   if (action === 'add_use' || action === 'remove_use') {
-    const { data: current, error: fetchError } = await supabase
-      .from('users')
-      .select('free_uses_remaining')
-      .eq('email', email)
-      .single();
-    
-    if (fetchError && fetchError.message?.includes('free_uses_remaining')) {
-      return NextResponse.json({ error: 'Column free_uses_remaining does not exist yet. Please run lib/supabase/schema.sql in Supabase SQL Editor.' }, { status: 400 });
-    }
-    if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+    let currentUses = 3;
+    let authUser = null;
+
+    try {
+      const { data: authData } = await supabase.auth.admin.listUsers();
+      authUser = authData?.users?.find(u => u.email === email);
+      if (authUser?.user_metadata?.free_uses_remaining !== undefined && authUser?.user_metadata?.free_uses_remaining !== null) {
+        currentUses = authUser.user_metadata.free_uses_remaining;
+      }
+    } catch (e) {}
+
+    try {
+      const { data: current } = await supabase
+        .from('users')
+        .select('free_uses_remaining')
+        .eq('email', email)
+        .single();
+      if (current?.free_uses_remaining !== undefined && current?.free_uses_remaining !== null) {
+        currentUses = current.free_uses_remaining;
+      }
+    } catch (e) {}
 
     const delta = action === 'add_use' ? 1 : -1;
-    const newValue = Math.max(0, (current?.free_uses_remaining ?? 0) + delta);
-    
-    let { error } = await supabase
-      .from('users')
-      .update({ free_uses_remaining: newValue, updated_at: new Date().toISOString() })
-      .eq('email', email);
+    const newValue = Math.max(0, currentUses + delta);
 
-    if (error && error.message?.includes('updated_at')) {
-      const fallback = await supabase
-        .from('users')
-        .update({ free_uses_remaining: newValue })
-        .eq('email', email);
-      error = fallback.error;
+    if (authUser) {
+      try {
+        await supabase.auth.admin.updateUserById(authUser.id, {
+          user_metadata: {
+            ...authUser.user_metadata,
+            free_uses_remaining: newValue,
+          },
+        });
+      } catch (e) {}
     }
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    try {
+      await supabase
+        .from('users')
+        .update({ free_uses_remaining: newValue, updated_at: new Date().toISOString() })
+        .eq('email', email);
+    } catch (e) {}
+
     return NextResponse.json({ ok: true, free_uses_remaining: newValue });
   }
 
