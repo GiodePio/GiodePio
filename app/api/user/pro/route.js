@@ -30,9 +30,10 @@ function getClientAuth(request) {
 export async function GET(request) {
   const supabaseAuth = getClientAuth(request);
   const { data: { user } } = await supabaseAuth.auth.getUser();
-  if (!user) return NextResponse.json({ is_pro: false, free_uses_remaining: 3, trial_exhausted: false });
+  if (!user || !user.email) return NextResponse.json({ is_pro: false, free_uses_remaining: 3, trial_exhausted: false });
 
-  if (user.email === 'lifegrading@gmail.com') {
+  const normEmail = user.email.toLowerCase();
+  if (normEmail === 'lifegrading@gmail.com') {
     return NextResponse.json({ is_pro: true, free_uses_remaining: null, trial_exhausted: false });
   }
 
@@ -40,6 +41,7 @@ export async function GET(request) {
   let isPro = false;
   let freeUses = 3;
 
+  // 1. Fetch fresh user metadata from Auth via service role to bypass stale session cookies
   try {
     const { data: authData } = await supabase.auth.admin.getUserById(user.id);
     const meta = authData?.user?.user_metadata;
@@ -49,11 +51,12 @@ export async function GET(request) {
     }
   } catch (e) {}
 
+  // 2. Check DB users table
   try {
     const { data } = await supabase
       .from('users')
       .select('is_pro, free_uses_remaining')
-      .eq('email', user.email)
+      .ilike('email', normEmail)
       .single();
 
     if (data) {

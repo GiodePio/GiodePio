@@ -54,11 +54,11 @@ export default function RemoteControlPage() {
       .then(d => {
         if (d.user?.email) {
           setUserEmail(d.user.email);
-          if (d.user.email === 'lifegrading@gmail.com') {
+          if (d.user.email.toLowerCase() === 'lifegrading@gmail.com') {
             setIsPro(true);
             setProChecked(true);
           } else {
-            fetch('/api/user/pro')
+            fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' })
               .then(r => r.json())
               .then(p => { setIsPro(p.is_pro); setProChecked(true); })
               .catch(() => { setIsPro(false); setProChecked(true); });

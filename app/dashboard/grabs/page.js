@@ -53,13 +53,13 @@ export default function GrabsPage() {
       .then(d => {
         if (d.user?.email) {
           setUserEmail(d.user.email);
-          if (d.user.email === 'lifegrading@gmail.com') {
+          if (d.user.email.toLowerCase() === 'lifegrading@gmail.com') {
             setIsPro(true);
             setProChecked(true);
             const url = '/api/grabs';
             return fetch(url);
           } else {
-            return fetch('/api/user/pro')
+            return fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' })
               .then(r => r.json())
               .then(p => {
                 setIsPro(p.is_pro);
