@@ -41,31 +41,53 @@ export async function GET(request) {
   let isPro = false;
   let freeUses = 3;
 
-  // 1. Fetch fresh user metadata from Auth via service role to bypass stale session cookies
+  // 1. Check pro_users table
   try {
-    const { data: authData } = await supabase.auth.admin.getUserById(user.id);
-    const meta = authData?.user?.user_metadata;
-    if (meta) {
-      if (typeof meta.is_pro === 'boolean') isPro = meta.is_pro;
-      if (typeof meta.free_uses_remaining === 'number') freeUses = meta.free_uses_remaining;
-    }
-  } catch (e) {}
-
-  // 2. Check DB users table
-  try {
-    const { data } = await supabase
-      .from('users')
+    const { data: proRecord } = await supabase
+      .from('pro_users')
       .select('is_pro, free_uses_remaining')
-      .ilike('email', normEmail)
+      .eq('email', normEmail)
       .single();
 
-    if (data) {
-      if (data.is_pro === true) isPro = true;
-      if (!isPro && typeof data.free_uses_remaining === 'number') {
-        freeUses = data.free_uses_remaining;
+    if (proRecord) {
+      if (typeof proRecord.is_pro === 'boolean') isPro = proRecord.is_pro;
+      if (!isPro && typeof proRecord.free_uses_remaining === 'number') {
+        freeUses = proRecord.free_uses_remaining;
       }
     }
   } catch (e) {}
+
+  // 2. Fallback check Auth user_metadata
+  if (!isPro) {
+    try {
+      const { data: authData } = await supabase.auth.admin.getUserById(user.id);
+      const meta = authData?.user?.user_metadata;
+      if (meta) {
+        if (meta.is_pro === true) isPro = true;
+        if (!isPro && typeof meta.free_uses_remaining === 'number') {
+          freeUses = meta.free_uses_remaining;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. Fallback check users table
+  if (!isPro) {
+    try {
+      const { data } = await supabase
+        .from('users')
+        .select('is_pro, free_uses_remaining')
+        .ilike('email', normEmail)
+        .single();
+
+      if (data) {
+        if (data.is_pro === true) isPro = true;
+        if (!isPro && typeof data.free_uses_remaining === 'number') {
+          freeUses = data.free_uses_remaining;
+        }
+      }
+    } catch (e) {}
+  }
 
   return NextResponse.json({
     is_pro: isPro,
