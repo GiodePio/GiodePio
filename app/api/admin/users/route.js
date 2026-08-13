@@ -97,7 +97,7 @@ export async function POST(request) {
     proExpiresAt = new Date(Date.now() + duration_seconds * 1000).toISOString();
   }
 
-  // ONLY Write to public.pro_users table (as requested by user)
+  // Write to public.pro_users table
   let proErr = null;
   try {
     const { error } = await supabase
@@ -115,8 +115,36 @@ export async function POST(request) {
   }
 
   if (proErr) {
-    return NextResponse.json({ error: `Supabase error (pro_users table missing?): ${proErr}` }, { status: 500 });
+    return NextResponse.json({ error: `Supabase error (pro_users table missing or column missing?): ${proErr}` }, { status: 500 });
   }
+
+  // Write to public.users as well just to keep tables in sync (ignore missing timer column)
+  try {
+    const { data: updatedRows, error: updateErr } = await supabase
+      .from('users')
+      .update({
+        is_pro,
+        free_uses_remaining: freeUses,
+        updated_at: new Date().toISOString(),
+      })
+      .ilike('email', normEmail)
+      .select();
+
+    if (updateErr || !updatedRows || updatedRows.length === 0) {
+      let targetAuthId = null;
+      const { data: authData } = await supabase.auth.admin.listUsers();
+      const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
+      if (targetAuth) targetAuthId = targetAuth.id;
+
+      await supabase.from('users').upsert({
+        id: targetAuthId,
+        email: normEmail,
+        is_pro,
+        free_uses_remaining: freeUses,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'email' });
+    }
+  } catch (e) {}
 
   const remainingProSeconds = proExpiresAt ? Math.max(0, Math.floor((new Date(proExpiresAt) - new Date()) / 1000)) : null;
 
@@ -153,7 +181,7 @@ export async function PATCH(request) {
     const delta = action === 'add_use' ? 1 : -1;
     const newValue = Math.max(0, currentUses + delta);
 
-    // ONLY Write to public.pro_users table
+    // Write to public.pro_users table
     let proErr = null;
     try {
       const { error } = await supabase
@@ -173,6 +201,34 @@ export async function PATCH(request) {
     if (proErr) {
       return NextResponse.json({ error: `Supabase error: ${proErr}` }, { status: 500 });
     }
+
+    // Write to public.users as well just to keep tables in sync
+    try {
+      const { data: updatedRows, error: updateErr } = await supabase
+        .from('users')
+        .update({
+          is_pro: false,
+          free_uses_remaining: newValue,
+          updated_at: new Date().toISOString(),
+        })
+        .ilike('email', normEmail)
+        .select();
+
+      if (updateErr || !updatedRows || updatedRows.length === 0) {
+        let targetAuthId = null;
+        const { data: authData } = await supabase.auth.admin.listUsers();
+        const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
+        if (targetAuth) targetAuthId = targetAuth.id;
+
+        await supabase.from('users').upsert({
+          id: targetAuthId,
+          email: normEmail,
+          is_pro: false,
+          free_uses_remaining: newValue,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'email' });
+      }
+    } catch (e) {}
 
     return NextResponse.json({ ok: true, email: normEmail, free_uses_remaining: newValue });
   }
