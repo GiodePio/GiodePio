@@ -97,42 +97,30 @@ export async function POST(request) {
     proExpiresAt = new Date(Date.now() + duration_seconds * 1000).toISOString();
   }
 
-  let proErr = null;
-
-  // 1. Upsert into public.pro_users table
-  try {
-    const { error } = await supabase
-      .from('pro_users')
-      .upsert({
-        email: normEmail,
-        is_pro,
-        pro_expires_at: proExpiresAt,
-        free_uses_remaining: freeUses,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'email' });
-    if (error) proErr = error.message;
-  } catch (e) {
-    proErr = e.message;
-  }
-
-  // 2. Update/upsert into public.users table
+  let targetAuthId = null;
+  let targetAuth = null;
   try {
     const { data: authData } = await supabase.auth.admin.listUsers();
-    const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
-    const targetAuthId = targetAuth?.id;
+    targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
+    if (targetAuth) targetAuthId = targetAuth.id;
+  } catch (e) {}
 
-    const { data: updatedRows } = await supabase
+  // 1. Primary Write: public.users table in Supabase
+  try {
+    const updatePayload = {
+      is_pro,
+      free_uses_remaining: freeUses,
+      updated_at: new Date().toISOString(),
+    };
+    if (proExpiresAt !== undefined) updatePayload.pro_expires_at = proExpiresAt;
+
+    const { data: updatedRows, error: updateErr } = await supabase
       .from('users')
-      .update({
-        is_pro,
-        pro_expires_at: proExpiresAt,
-        free_uses_remaining: freeUses,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .ilike('email', normEmail)
       .select();
 
-    if (!updatedRows || updatedRows.length === 0) {
+    if (updateErr || !updatedRows || updatedRows.length === 0) {
       await supabase.from('users').upsert({
         id: targetAuthId,
         email: normEmail,
@@ -142,26 +130,35 @@ export async function POST(request) {
         updated_at: new Date().toISOString(),
       }, { onConflict: 'email' });
     }
+  } catch (e) {
+    console.error('Best-effort users table write:', e);
+  }
+
+  // 2. Secondary Write: public.pro_users table (if table exists)
+  try {
+    await supabase
+      .from('pro_users')
+      .upsert({
+        email: normEmail,
+        is_pro,
+        pro_expires_at: proExpiresAt,
+        free_uses_remaining: freeUses,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'email' });
   } catch (e) {}
 
-  // 3. Update Auth user_metadata
-  try {
-    const { data: authData } = await supabase.auth.admin.listUsers();
-    const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
-    if (targetAuth) {
-      await supabase.auth.admin.updateUserById(targetAuth.id, {
+  // 3. Fallback Write: Auth user_metadata
+  if (targetAuthId) {
+    try {
+      await supabase.auth.admin.updateUserById(targetAuthId, {
         user_metadata: {
-          ...(targetAuth.user_metadata || {}),
+          ...(targetAuth?.user_metadata || {}),
           is_pro,
           pro_expires_at: proExpiresAt,
           free_uses_remaining: freeUses,
         },
       });
-    }
-  } catch (e) {}
-
-  if (proErr) {
-    return NextResponse.json({ error: `Supabase error: ${proErr}` }, { status: 500 });
+    } catch (e) {}
   }
 
   const remainingProSeconds = proExpiresAt ? Math.max(0, Math.floor((new Date(proExpiresAt) - new Date()) / 1000)) : null;
@@ -199,31 +196,17 @@ export async function PATCH(request) {
     const delta = action === 'add_use' ? 1 : -1;
     const newValue = Math.max(0, currentUses + delta);
 
-    let proErr = null;
-
-    // 1. Upsert pro_users table
-    try {
-      const { error } = await supabase
-        .from('pro_users')
-        .upsert({
-          email: normEmail,
-          is_pro: false,
-          pro_expires_at: null,
-          free_uses_remaining: newValue,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'email' });
-      if (error) proErr = error.message;
-    } catch (e) {
-      proErr = e.message;
-    }
-
-    // 2. Update public.users table
+    let targetAuthId = null;
+    let targetAuth = null;
     try {
       const { data: authData } = await supabase.auth.admin.listUsers();
-      const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
-      const targetAuthId = targetAuth?.id;
+      targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
+      if (targetAuth) targetAuthId = targetAuth.id;
+    } catch (e) {}
 
-      const { data: updatedRows } = await supabase
+    // 1. Primary Write: public.users
+    try {
+      const { data: updatedRows, error: updateErr } = await supabase
         .from('users')
         .update({
           is_pro: false,
@@ -234,7 +217,7 @@ export async function PATCH(request) {
         .ilike('email', normEmail)
         .select();
 
-      if (!updatedRows || updatedRows.length === 0) {
+      if (updateErr || !updatedRows || updatedRows.length === 0) {
         await supabase.from('users').upsert({
           id: targetAuthId,
           email: normEmail,
@@ -246,24 +229,31 @@ export async function PATCH(request) {
       }
     } catch (e) {}
 
-    // 3. Update Auth user_metadata
+    // 2. Secondary Write: public.pro_users
     try {
-      const { data: authData } = await supabase.auth.admin.listUsers();
-      const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
-      if (targetAuth) {
-        await supabase.auth.admin.updateUserById(targetAuth.id, {
+      await supabase
+        .from('pro_users')
+        .upsert({
+          email: normEmail,
+          is_pro: false,
+          pro_expires_at: null,
+          free_uses_remaining: newValue,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'email' });
+    } catch (e) {}
+
+    // 3. Fallback Write: Auth user_metadata
+    if (targetAuthId) {
+      try {
+        await supabase.auth.admin.updateUserById(targetAuthId, {
           user_metadata: {
-            ...(targetAuth.user_metadata || {}),
+            ...(targetAuth?.user_metadata || {}),
             is_pro: false,
             pro_expires_at: null,
             free_uses_remaining: newValue,
           },
         });
-      }
-    } catch (e) {}
-
-    if (proErr) {
-      return NextResponse.json({ error: `Supabase error: ${proErr}` }, { status: 500 });
+      } catch (e) {}
     }
 
     return NextResponse.json({ ok: true, email: normEmail, free_uses_remaining: newValue });
