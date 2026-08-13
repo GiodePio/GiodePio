@@ -38,10 +38,8 @@ export async function GET(request) {
   }
 
   const supabase = getClient();
-  let isPro = false;
-  let freeUses = 3;
 
-  // 1. Check pro_users table
+  // 1. Check pro_users table as primary authority
   try {
     const { data: proRecord } = await supabase
       .from('pro_users')
@@ -49,49 +47,54 @@ export async function GET(request) {
       .eq('email', normEmail)
       .single();
 
-    if (proRecord) {
-      if (typeof proRecord.is_pro === 'boolean') isPro = proRecord.is_pro;
-      if (!isPro && typeof proRecord.free_uses_remaining === 'number') {
-        freeUses = proRecord.free_uses_remaining;
-      }
+    if (proRecord && typeof proRecord.is_pro === 'boolean') {
+      const isPro = proRecord.is_pro;
+      const freeUses = isPro ? null : (proRecord.free_uses_remaining ?? 3);
+      return NextResponse.json({
+        is_pro: isPro,
+        free_uses_remaining: freeUses,
+        trial_exhausted: !isPro && freeUses <= 0,
+      });
     }
   } catch (e) {}
 
-  // 2. Fallback check Auth user_metadata
-  if (!isPro) {
-    try {
-      const { data: authData } = await supabase.auth.admin.getUserById(user.id);
-      const meta = authData?.user?.user_metadata;
-      if (meta) {
-        if (meta.is_pro === true) isPro = true;
-        if (!isPro && typeof meta.free_uses_remaining === 'number') {
-          freeUses = meta.free_uses_remaining;
-        }
-      }
-    } catch (e) {}
-  }
+  // 2. Check Auth user_metadata if no pro_users record
+  try {
+    const { data: authData } = await supabase.auth.admin.getUserById(user.id);
+    const meta = authData?.user?.user_metadata;
+    if (meta && typeof meta.is_pro === 'boolean') {
+      const isPro = meta.is_pro;
+      const freeUses = isPro ? null : (meta.free_uses_remaining ?? 3);
+      return NextResponse.json({
+        is_pro: isPro,
+        free_uses_remaining: freeUses,
+        trial_exhausted: !isPro && freeUses <= 0,
+      });
+    }
+  } catch (e) {}
 
-  // 3. Fallback check users table
-  if (!isPro) {
-    try {
-      const { data } = await supabase
-        .from('users')
-        .select('is_pro, free_uses_remaining')
-        .ilike('email', normEmail)
-        .single();
+  // 3. Check users table
+  try {
+    const { data } = await supabase
+      .from('users')
+      .select('is_pro, free_uses_remaining')
+      .ilike('email', normEmail)
+      .single();
 
-      if (data) {
-        if (data.is_pro === true) isPro = true;
-        if (!isPro && typeof data.free_uses_remaining === 'number') {
-          freeUses = data.free_uses_remaining;
-        }
-      }
-    } catch (e) {}
-  }
+    if (data && typeof data.is_pro === 'boolean') {
+      const isPro = data.is_pro;
+      const freeUses = isPro ? null : (data.free_uses_remaining ?? 3);
+      return NextResponse.json({
+        is_pro: isPro,
+        free_uses_remaining: freeUses,
+        trial_exhausted: !isPro && freeUses <= 0,
+      });
+    }
+  } catch (e) {}
 
   return NextResponse.json({
-    is_pro: isPro,
-    free_uses_remaining: isPro ? null : freeUses,
-    trial_exhausted: !isPro && freeUses <= 0,
+    is_pro: false,
+    free_uses_remaining: 3,
+    trial_exhausted: false,
   });
 }

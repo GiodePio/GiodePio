@@ -42,14 +42,12 @@ export async function GET(request) {
 
   const supabase = getClient();
 
-  // 1. Fetch auth users
   let authUsersList = [];
   try {
     const { data: authData } = await supabase.auth.admin.listUsers();
     if (authData?.users) authUsersList = authData.users;
   } catch (e) {}
 
-  // 2. Fetch pro_users table
   let proUsersMap = new Map();
   try {
     const { data: proData } = await supabase
@@ -62,7 +60,6 @@ export async function GET(request) {
     }
   } catch (e) {}
 
-  // 3. Build response user list
   const userMap = new Map();
 
   for (const au of authUsersList) {
@@ -73,23 +70,20 @@ export async function GET(request) {
 
     const isOwner = isOwnerEmail(normEmail);
     let isPro = isOwner;
+    let freeUses = null;
+
     if (isOwner) {
       isPro = true;
+      freeUses = null;
     } else if (proRecord && typeof proRecord.is_pro === 'boolean') {
       isPro = proRecord.is_pro;
-    } else if (typeof meta.is_pro === 'boolean') {
+      freeUses = isPro ? null : (proRecord.free_uses_remaining ?? 3);
+    } else if (meta && typeof meta.is_pro === 'boolean') {
       isPro = meta.is_pro;
-    }
-
-    let freeUses = null;
-    if (!isPro) {
-      if (proRecord && typeof proRecord.free_uses_remaining === 'number') {
-        freeUses = proRecord.free_uses_remaining;
-      } else if (typeof meta.free_uses_remaining === 'number') {
-        freeUses = meta.free_uses_remaining;
-      } else {
-        freeUses = 3;
-      }
+      freeUses = isPro ? null : (meta.free_uses_remaining ?? 3);
+    } else {
+      isPro = false;
+      freeUses = 3;
     }
 
     userMap.set(normEmail, {
@@ -186,7 +180,6 @@ export async function PATCH(request) {
   if (action === 'add_use' || action === 'remove_use') {
     let currentUses = 3;
 
-    // Check pro_users table
     try {
       const { data: proRecord } = await supabase
         .from('pro_users')
