@@ -4,21 +4,20 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 const colors = {
-  bg: '#0a0a0f',
-  surface: '#12121a',
-  surfaceHover: '#1a1a24',
+  bg: '#050508',
+  panel: 'rgba(13, 13, 18, 0.7)',
+  surface: 'rgba(10, 10, 16, 0.8)',
   border: 'rgba(255,255,255,0.06)',
-  borderHover: 'rgba(255,255,255,0.12)',
   text: '#f0f0f0',
   textDim: '#6b6e7b',
   green: '#22c55e',
-  greenBg: 'rgba(34, 197, 94, 0.12)',
+  blue: '#3b82f6',
   red: '#ef4444',
 };
 
 function NavItem({ icon, label, active, onClick }) {
   return (
-    <div onClick={onClick} style={{
+    <div onClick={onClick} className="btn-smooth" style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
       background: active ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
       color: active ? colors.green : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
@@ -54,15 +53,10 @@ export default function RemoteControlPage() {
       .then(d => {
         if (d.user?.email) {
           setUserEmail(d.user.email);
-          if (d.user.email.toLowerCase() === 'lifegrading@gmail.com') {
-            setIsPro(true);
-            setProChecked(true);
-          } else {
-            fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' })
-              .then(r => r.json())
-              .then(p => { setIsPro(p.is_pro); setProChecked(true); })
-              .catch(() => { setIsPro(false); setProChecked(true); });
-          }
+          fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' })
+            .then(r => r.json())
+            .then(p => { setIsPro(p.is_pro); setProChecked(true); })
+            .catch(() => { setIsPro(false); setProChecked(true); });
         } else {
           setProChecked(true);
         }
@@ -71,7 +65,7 @@ export default function RemoteControlPage() {
   }, []);
 
   useEffect(() => {
-    if (!proChecked || (!isPro && userEmail !== 'lifegrading@gmail.com')) return;
+    if (!proChecked || !isPro) return;
 
     fetch('/api/stream')
       .then(r => r.json())
@@ -82,7 +76,7 @@ export default function RemoteControlPage() {
       fetch('/api/stream').then(r => r.json()).then(d => setOnlineUsers(d.online || [])).catch(() => {});
     }, 3000);
     return () => clearInterval(iv);
-  }, [proChecked, isPro, userEmail]);
+  }, [proChecked, isPro]);
 
   if (!proChecked) {
     return (
@@ -92,7 +86,7 @@ export default function RemoteControlPage() {
     );
   }
 
-  if (!isPro && userEmail !== 'lifegrading@gmail.com') {
+  if (!isPro) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
@@ -139,65 +133,56 @@ export default function RemoteControlPage() {
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: colors.textDim, fontSize: 14 }}>🔍</span>
             <input
-              placeholder="Search devices..."
+              type="text"
+              placeholder="Search..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{
-                background: colors.surface,
+                background: 'rgba(255,255,255,0.03)',
                 border: `1px solid ${colors.border}`,
                 borderRadius: 8,
-                padding: '8px 14px 8px 34px',
+                padding: '8px 14px 8px 36px',
                 color: colors.text,
                 fontSize: 13,
-                width: 200,
                 outline: 'none',
+                width: 220,
               }}
-              onFocus={e => e.target.style.borderColor = colors.borderHover}
-              onBlur={e => e.target.style.borderColor = colors.border}
             />
           </div>
         </div>
 
         {loading ? (
-          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading...</div>
+          <div style={{ textAlign: 'center', padding: '60px', color: colors.textDim, fontSize: 13 }}>Loading active streams...</div>
         ) : filtered.length === 0 ? (
-          <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
-            <span style={{ fontSize: 28, marginBottom: 8 }}>{onlineUsers.length === 0 ? '📡' : '🔍'}</span>
-            <span style={{ fontSize: 14 }}>{onlineUsers.length === 0 ? 'No devices online' : 'No devices match your search'}</span>
-          </div>
+          <div style={{ textAlign: 'center', padding: '60px', color: colors.textDim, fontSize: 13 }}>No active streams found. Make sure mod users are online.</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
             {filtered.map(u => (
-              <div key={u.username} onClick={() => router.push('/dashboard/remote-control/' + encodeURIComponent(u.username))} style={{
-                background: colors.surface,
-                border: `1px solid ${colors.border}`,
-                borderRadius: 12,
-                padding: '14px 18px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 14,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = colors.surfaceHover; e.currentTarget.style.borderColor = colors.borderHover; }}
-              onMouseLeave={e => { e.currentTarget.style.background = colors.surface; e.currentTarget.style.borderColor = colors.border; }}
+              <div
+                key={u.username}
+                onClick={() => router.push(`/dashboard/remote-control/${encodeURIComponent(u.username)}`)}
+                className="glass-card btn-smooth"
+                style={{
+                  padding: 20,
+                  borderRadius: 12,
+                  border: `1px solid ${colors.border}`,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                }}
               >
-                <div style={{ position: 'relative' }}>
-                  <img src={'https://mc-heads.net/avatar/' + u.username + '/40'} alt="" style={{ width: 40, height: 40, borderRadius: 8 }} />
-                  <div style={{ position: 'absolute', bottom: -2, right: -2, width: 12, height: 12, borderRadius: '50%', background: colors.green, border: `2px solid ${colors.surface}` }} />
+                <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(34, 197, 94, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  <img src={`https://mc-heads.net/avatar/${u.username}/44`} alt="" style={{ width: 44, height: 44 }} onError={e => { e.target.style.display = 'none'; }} />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600 }}>{u.username}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: colors.textDim, background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: 4 }}>
-                      <span style={{ fontSize: 12 }}>🪟</span> Windows
-                    </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: colors.text }}>{u.username}</div>
+                  <div style={{ fontSize: 12, color: colors.green, display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: colors.green, display: 'inline-block' }} />
+                    Streaming Live
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontSize: 12, color: colors.green, background: colors.greenBg, padding: '4px 10px', borderRadius: 6, fontWeight: 500 }}>Online</span>
-                  <span style={{ color: colors.textDim, fontSize: 18 }}>→</span>
-                </div>
+                <span style={{ fontSize: 16, color: colors.textDim }}>→</span>
               </div>
             ))}
           </div>
