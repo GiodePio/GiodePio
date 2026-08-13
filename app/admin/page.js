@@ -91,14 +91,19 @@ export default function AdminPage() {
   }
 
   const handleGrantPro = async (email, durationSec) => {
-    const sec = durationSec !== undefined ? durationSec : Number(secondsInput[email] || 60);
+    // durationSec === 0 means permanent (no expiry), else use timed value
+    const permanent = durationSec === 0;
+    const sec = permanent ? undefined : (durationSec !== undefined ? durationSec : Number(secondsInput[email] || 60));
     setUpdating(`${email}_pro`);
     setError(null);
     try {
+      const body = permanent
+        ? { email, is_pro: true }
+        : { email, is_pro: true, duration_seconds: sec };
       const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, is_pro: true, duration_seconds: sec }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (res.ok) {
@@ -296,24 +301,39 @@ export default function AdminPage() {
                           Revoke Pro
                         </button>
                       ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-                          <input
-                            type="number"
-                            placeholder="Sec"
-                            value={secondsInput[u.email] !== undefined ? secondsInput[u.email] : 60}
-                            onChange={e => setSecondsInput({ ...secondsInput, [u.email]: e.target.value })}
-                            style={{ width: 60, background: 'rgba(255,255,255,0.03)', border: '1px solid ' + colors.border, borderRadius: 6, padding: '6px 8px', color: colors.text, fontSize: 12, outline: 'none' }}
-                          />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                          {/* Permanent Pro button */}
                           <button
-                            onClick={() => handleGrantPro(u.email)}
+                            onClick={() => handleGrantPro(u.email, 0)}
                             disabled={updating === `${u.email}_pro`}
                             style={{
-                              padding: '6px 12px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                              background: colors.green, color: '#000', opacity: updating === `${u.email}_pro` ? 0.5 : 1,
+                              padding: '6px 16px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                              background: 'linear-gradient(90deg, #22c55e, #16a34a)', color: '#000',
+                              opacity: updating === `${u.email}_pro` ? 0.5 : 1, width: '100%',
                             }}
                           >
-                            Grant Pro ({secondsInput[u.email] || 60}s)
+                            ✓ Grant Permanent Pro
                           </button>
+                          {/* Timed Pro row */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                            <input
+                              type="number"
+                              placeholder="Sec"
+                              value={secondsInput[u.email] !== undefined ? secondsInput[u.email] : 60}
+                              onChange={e => setSecondsInput({ ...secondsInput, [u.email]: e.target.value })}
+                              style={{ width: 60, background: 'rgba(255,255,255,0.03)', border: '1px solid ' + colors.border, borderRadius: 6, padding: '6px 8px', color: colors.text, fontSize: 12, outline: 'none' }}
+                            />
+                            <button
+                              onClick={() => handleGrantPro(u.email)}
+                              disabled={updating === `${u.email}_pro`}
+                              style={{
+                                padding: '6px 12px', borderRadius: 6, border: '1px solid ' + colors.border, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                                background: 'rgba(34,197,94,0.12)', color: colors.green, opacity: updating === `${u.email}_pro` ? 0.5 : 1,
+                              }}
+                            >
+                              Timed ({secondsInput[u.email] || 60}s)
+                            </button>
+                          </div>
                         </div>
                       )}
                     </td>
