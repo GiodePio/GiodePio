@@ -42,21 +42,24 @@ export default function SettingsPage() {
       .then(r => r.json())
       .then(d => {
         if (d.user?.email) {
-          setUserEmail(d.user.email);
+          const email = d.user.email;
+          setUserEmail(email);
           setProChecked(true);
-          return fetch(`/api/user/minecraft?email=${encodeURIComponent(d.user.email)}`);
+
+          fetch(`/api/user/minecraft?email=${encodeURIComponent(email)}`)
+            .then(r => r.json())
+            .then(mc => { if (mc?.username) { setMinecraftUsername(mc.username); setMcSaved(true); } })
+            .catch(() => {});
+
+          fetch(`/api/user/settings?email=${encodeURIComponent(email)}`)
+            .then(r => r.json())
+            .then(s => { if (s?.webhook_url) setWebhook(s.webhook_url); })
+            .catch(() => {});
         } else {
           setProChecked(true);
         }
       })
-      .then(r => r ? r.json() : null)
-      .then(d => { if (d?.username) { setMinecraftUsername(d.username); setMcSaved(true); } })
-      .catch(() => {});
-
-    fetch(`/api/user/settings?email=${encodeURIComponent(userEmail)}`)
-      .then(r => r.json())
-      .then(d => { if (d?.webhook_url) setWebhook(d.webhook_url); })
-      .catch(() => {});
+      .catch(() => { setProChecked(true); });
   }, []);
 
   const handleSave = async () => {
