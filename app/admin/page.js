@@ -76,6 +76,7 @@ export default function AdminPage() {
 
   const handleTogglePro = async (email, currentIsPro) => {
     setUpdating(`${email}_pro`);
+    setError(null);
     try {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
@@ -85,16 +86,21 @@ export default function AdminPage() {
       const data = await res.json();
       if (res.ok) {
         const updated = users.map(u =>
-          u.email === email ? { ...u, is_pro: !currentIsPro } : u
+          u.email === email ? { ...u, is_pro: !currentIsPro, free_uses_remaining: !currentIsPro ? null : 3 } : u
         );
         setUsers(updated);
+      } else {
+        setError(`Failed to update Pro status for ${email}: ${data.error || res.statusText}`);
       }
-    } catch (e) { }
+    } catch (e) {
+      setError(`Network error updating Pro status: ${e.message}`);
+    }
     setUpdating(null);
   };
 
   const handleAdjustUses = async (email, action) => {
     setUpdating(`${email}_${action}`);
+    setError(null);
     try {
       const res = await fetch('/api/admin/users', {
         method: 'PATCH',
@@ -107,8 +113,12 @@ export default function AdminPage() {
         setUsers(users.map(u =>
           u.email === email ? { ...u, free_uses_remaining: newUses } : u
         ));
+      } else {
+        setError(`Failed to adjust uses for ${email}: ${data.error || res.statusText}`);
       }
-    } catch (e) { }
+    } catch (e) {
+      setError(`Network error adjusting uses: ${e.message}`);
+    }
     setUpdating(null);
   };
 

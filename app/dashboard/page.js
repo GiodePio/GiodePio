@@ -189,7 +189,7 @@ function Plans({ freeUses, isPro, trialExhausted }) {
             <div style={{ fontSize: 12, color: colors.blue, letterSpacing: 1, marginBottom: 6, fontWeight: 600 }}>🚀 GET STARTED</div>
             <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$0</div>
             <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 20 }}>One-time, no card needed</div>
-            {['3 captures included', 'Basic system info', 'Discord webhook', 'Livestream preview'].map((f, i) => (
+            {['3 captures included', 'Basic system info', 'Discord webhook'].map((f, i) => (
               <div key={i} style={{ fontSize: 13, color: colors.text, marginBottom: 8, display: 'flex', gap: 8 }}>
                 <span style={{ color: colors.blue }}>✓</span> {f}
               </div>
@@ -212,7 +212,7 @@ function Plans({ freeUses, isPro, trialExhausted }) {
             <div style={{ fontSize: 12, color: colors.green, letterSpacing: 1, marginBottom: 6, fontWeight: 600 }}>👑 ULTIMATE GRABS</div>
             <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$5</div>
             <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 20 }}>/ month</div>
-            {['Unlimited sessions', 'Permanent data retention', 'Webhook notifications', 'Auth Mods & Builds', 'Priority support'].map((f, i) => (
+            {['Unlimited sessions', 'Permanent data retention', 'Webhook notifications', 'Auth Mods & Builds', 'Remote control access', 'Priority support'].map((f, i) => (
               <div key={i} style={{ fontSize: 13, color: colors.text, marginBottom: 8, display: 'flex', gap: 8 }}>
                 <span style={{ color: colors.green }}>✓</span> {f}
               </div>

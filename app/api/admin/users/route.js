@@ -97,7 +97,11 @@ export async function POST(request) {
 
   const supabase = getClient();
 
-  const updates = { is_pro, updated_at: new Date().toISOString() };
+  const updates = {
+    is_pro,
+    free_uses_remaining: is_pro ? null : 3,
+    updated_at: new Date().toISOString()
+  };
 
   const { error } = await supabase
     .from('users')
