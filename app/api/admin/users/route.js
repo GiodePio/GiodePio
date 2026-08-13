@@ -64,6 +64,8 @@ export async function POST(request) {
   const updates = { is_pro, updated_at: new Date().toISOString() };
   if (is_pro) {
     updates.free_uses_remaining = null;
+  } else {
+    updates.free_uses_remaining = 0;
   }
 
   const { error } = await supabase

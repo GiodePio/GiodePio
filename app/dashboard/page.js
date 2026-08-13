@@ -11,6 +11,7 @@ const colors = {
   textDim: '#6b6e7b',
   green: '#22c55e',
   blue: '#3b82f6',
+  red: '#ef4444',
 };
 
 function NavItem({ icon, label, active, onClick }) {
@@ -69,7 +70,7 @@ function Dashboard({ userEmail, freeUses, isPro, trialExhausted }) {
       {showTrialBadge && (
         <div style={{ marginBottom: 24, padding: '12px 16px', background: 'rgba(59, 130, 246, 0.08)', border: '1px solid ' + colors.blue, borderRadius: 8, fontSize: 13, color: colors.text }}>
           <strong style={{ color: colors.blue }}>Free Trial:</strong> {freeUses} of 3 uses remaining
-          {trialExhausted && <span style={{ color: colors.red || '#ef4444', marginLeft: 8 }}>— Upgrade to Pro for unlimited captures</span>}
+          {trialExhausted && <span style={{ color: colors.red, marginLeft: 8 }}>— Upgrade to Pro for unlimited captures</span>}
         </div>
       )}
       {trialExhausted && (
