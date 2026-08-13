@@ -42,7 +42,7 @@ export default function AdminPage() {
     fetch('/api/auth/user')
       .then(r => r.json())
       .then(d => {
-        if (d.user?.email?.toLowerCase() !== 'lifegrading@gmail.com') {
+        if (!d.user || d.user.email?.toLowerCase().trim() !== 'lifegrading@gmail.com') {
           setError('Unauthorized');
           setLoading(false);
           return;
@@ -85,8 +85,9 @@ export default function AdminPage() {
       }
     } catch (e) {
       setError('Network error: ' + (e.message || 'Failed to load users'));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   const handleGrantPro = async (email, durationSec) => {
@@ -117,8 +118,9 @@ export default function AdminPage() {
       }
     } catch (e) {
       setError(`Network error granting Pro: ${e.message}`);
+    } finally {
+      setUpdating(null);
     }
-    setUpdating(null);
   };
 
   const handleRevokePro = async (email) => {
@@ -148,8 +150,9 @@ export default function AdminPage() {
       }
     } catch (e) {
       setError(`Network error revoking Pro: ${e.message}`);
+    } finally {
+      setUpdating(null);
     }
-    setUpdating(null);
   };
 
   const handleAdjustUses = async (email, action) => {
@@ -173,14 +176,15 @@ export default function AdminPage() {
       }
     } catch (e) {
       setError(`Network error adjusting uses: ${e.message}`);
+    } finally {
+      setUpdating(null);
     }
-    setUpdating(null);
   };
 
   if (loading) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading...</div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading users...</div>
       </div>
     );
   }
@@ -191,7 +195,7 @@ export default function AdminPage() {
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
           <div style={{ fontSize: 48 }}>🔒</div>
           <div style={{ fontSize: 18, fontWeight: 600 }}>Access Denied</div>
-          <div style={{ fontSize: 14, color: colors.textDim }}>Admin privileges required.</div>
+          <div style={{ fontSize: 14, color: colors.textDim }}>Please log in as owner (lifegrading@gmail.com) to access Admin panel.</div>
         </div>
       </div>
     );
@@ -350,7 +354,7 @@ export default function AdminPage() {
             </tbody>
           </table>
           {users.length === 0 && !loading && (
-            <div style={{ textAlign: 'center', padding: '60px', color: colors.textDim, fontSize: 13 }}>No users found</div>
+            <div style={{ textAlign: 'center', padding: '60px', color: colors.textDim, fontSize: 13 }}>No users found in database. Create or log in with an account to get started.</div>
           )}
         </div>
       </main>
