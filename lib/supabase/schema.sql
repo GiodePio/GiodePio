@@ -8,6 +8,7 @@ create extension if not exists "uuid-ossp";
 create table if not exists public.pro_users (
   email text primary key,
   is_pro boolean default false,
+  pro_expires_at timestamptz,
   free_uses_remaining integer default 3,
   updated_at timestamptz default now()
 );

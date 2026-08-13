@@ -30,24 +30,19 @@ function NavItem({ icon, label, active, onClick }) {
   );
 }
 
-const STATUS_COLORS = {
-  online: colors.green,
-  idle: colors.blue,
-  offline: colors.textDim,
-};
-
 export default function AdminPage() {
   const router = useRouter();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState(null);
+  const [secondsInput, setSecondsInput] = useState({});
 
   useEffect(() => {
     fetch('/api/auth/user')
       .then(r => r.json())
       .then(d => {
-        if (d.user?.email !== 'lifegrading@gmail.com') {
+        if (d.user?.email?.toLowerCase() !== 'lifegrading@gmail.com') {
           setError('Unauthorized');
           setLoading(false);
           return;
@@ -57,11 +52,32 @@ export default function AdminPage() {
       .catch(() => { setError('Auth check failed'); setLoading(false); });
   }, []);
 
+  // Tick counter every second to update remaining seconds live in UI
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setUsers(prevUsers =>
+        prevUsers.map(u => {
+          if (u.is_pro && typeof u.remaining_pro_seconds === 'number' && u.remaining_pro_seconds > 0) {
+            const nextSec = u.remaining_pro_seconds - 1;
+            return {
+              ...u,
+              remaining_pro_seconds: nextSec,
+              is_pro: nextSec > 0,
+              free_uses_remaining: nextSec > 0 ? null : 3,
+            };
+          }
+          return u;
+        })
+      );
+    }, 1000);
+    return () => clearInterval(iv);
+  }, []);
+
   async function fetchUsers() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/users');
+      const res = await fetch('/api/admin/users?t=' + Date.now(), { cache: 'no-store' });
       const data = await res.json();
       if (res.ok) {
         setUsers(data.users || []);
@@ -74,26 +90,48 @@ export default function AdminPage() {
     setLoading(false);
   }
 
-  const handleTogglePro = async (email, currentIsPro) => {
+  const handleGrantPro = async (email, durationSec) => {
+    const sec = durationSec !== undefined ? durationSec : Number(secondsInput[email] || 3600);
     setUpdating(`${email}_pro`);
     setError(null);
     try {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, is_pro: !currentIsPro }),
+        body: JSON.stringify({ email, is_pro: true, duration_seconds: sec }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        fetchUsers();
+      } else {
+        setError(`Failed to grant Pro for ${email}: ${data.error || res.statusText}`);
+      }
+    } catch (e) {
+      setError(`Network error granting Pro: ${e.message}`);
+    }
+    setUpdating(null);
+  };
+
+  const handleRevokePro = async (email) => {
+    setUpdating(`${email}_pro`);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, is_pro: false }),
       });
       const data = await res.json();
       if (res.ok) {
         const updated = users.map(u =>
-          u.email === email ? { ...u, is_pro: !currentIsPro, free_uses_remaining: !currentIsPro ? null : 3 } : u
+          u.email === email ? { ...u, is_pro: false, pro_expires_at: null, remaining_pro_seconds: null, free_uses_remaining: 3 } : u
         );
         setUsers(updated);
       } else {
-        setError(`Failed to update Pro status for ${email}: ${data.error || res.statusText}`);
+        setError(`Failed to revoke Pro for ${email}: ${data.error || res.statusText}`);
       }
     } catch (e) {
-      setError(`Network error updating Pro status: ${e.message}`);
+      setError(`Network error revoking Pro: ${e.message}`);
     }
     setUpdating(null);
   };
@@ -148,23 +186,6 @@ export default function AdminPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <div style={{ flex: 1, padding: '28px 36px' }}>
-          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: 12, padding: '24px', color: colors.text, marginBottom: 24 }}>
-            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: colors.red }}>⚠ Database Error</div>
-            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 16, whiteSpace: 'pre-wrap' }}>{error}</div>
-            <button onClick={() => fetchUsers()} style={{ cursor: 'pointer', padding: '8px 20px', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>Retry</button>
-          </div>
-          <div style={{ fontSize: 13, color: colors.textDim }}>
-            If this persists, run the schema in Supabase SQL Editor: `lib/supabase/schema.sql`
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
@@ -197,51 +218,101 @@ export default function AdminPage() {
           <div onClick={() => fetchUsers()} style={{ cursor: 'pointer', padding: '8px 16px', background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 8, fontSize: 13 }}>↻ Refresh</div>
         </div>
 
+        {error && (
+          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: 8, padding: '12px 16px', color: colors.text, marginBottom: 20, fontSize: 13 }}>
+            ⚠ {error}
+          </div>
+        )}
+
         <div className="glass-card" style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid ' + colors.border }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
                 <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Email</th>
-                <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Display Name</th>
-                <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Pro</th>
-                <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Free Uses</th>
-                <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Adjust</th>
-                <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Created</th>
+                <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Pro Status</th>
+                <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Grant / Revoke Pro (in Seconds)</th>
+                <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Free Uses Remaining</th>
+                <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Adjust Uses</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => {
                 const isPro = u.is_pro;
+                const remainingSec = u.remaining_pro_seconds;
                 const freeUses = u.free_uses_remaining;
-                const displayFreeUses = isPro ? '∞' : (freeUses !== null && freeUses !== undefined ? String(freeUses) : '—');
-                const canAdjust = !isPro;
+                const displayFreeUses = isPro ? '∞ (Pro)' : (freeUses !== null && freeUses !== undefined ? `${freeUses} remaining` : '3 remaining');
+                const isOwner = u.email?.toLowerCase() === 'lifegrading@gmail.com';
+
                 return (
                   <tr key={u.id} style={{ borderBottom: '1px solid ' + colors.border }}>
-                    <td style={{ padding: '12px 16px', fontSize: 13, color: colors.text }}>{u.email}</td>
-                    <td style={{ padding: '12px 16px', fontSize: 13, color: colors.text }}>{u.display_name || '—'}</td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <button
-                        onClick={() => handleTogglePro(u.email, isPro)}
-                        disabled={updating === `${u.email}_pro`}
-                        style={{
-                          padding: '6px 16px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                          background: isPro ? colors.green : 'rgba(239, 68, 68, 0.15)',
-                          color: isPro ? '#000' : colors.red,
-                          opacity: updating === `${u.email}_pro` ? 0.5 : 1,
-                        }}
-                      >
-                        {updating === `${u.email}_pro` ? '...' : (isPro ? 'Pro' : 'Set Pro')}
-                      </button>
+                    <td style={{ padding: '14px 16px', fontSize: 13, color: colors.text }}>
+                      <div>{u.email}</div>
+                      {isOwner && <span style={{ fontSize: 10, color: colors.green, fontWeight: 700 }}>OWNER</span>}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: 13, color: isPro ? colors.green : colors.text }}>
+
+                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                      {isPro ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                          <span style={{ background: 'rgba(34, 197, 94, 0.15)', color: colors.green, fontSize: 11, padding: '4px 12px', borderRadius: 6, fontWeight: 700 }}>👑 PRO</span>
+                          {typeof remainingSec === 'number' && (
+                            <span style={{ fontSize: 11, color: colors.blue, fontFamily: 'monospace' }}>⏳ {remainingSec}s left</span>
+                          )}
+                          {remainingSec === null && !isOwner && (
+                            <span style={{ fontSize: 10, color: colors.textDim }}>Permanent Pro</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: colors.red, fontSize: 11, padding: '4px 12px', borderRadius: 6, fontWeight: 600 }}>FREE TRIAL</span>
+                      )}
+                    </td>
+
+                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                      {isOwner ? (
+                        <span style={{ fontSize: 11, color: colors.textDim }}>Permanent Owner</span>
+                      ) : isPro ? (
+                        <button
+                          onClick={() => handleRevokePro(u.email)}
+                          disabled={updating === `${u.email}_pro`}
+                          style={{
+                            padding: '6px 14px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                            background: colors.red, color: '#fff', opacity: updating === `${u.email}_pro` ? 0.5 : 1,
+                          }}
+                        >
+                          Revoke Pro
+                        </button>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                          <input
+                            type="number"
+                            placeholder="Sec"
+                            value={secondsInput[u.email] !== undefined ? secondsInput[u.email] : 60}
+                            onChange={e => setSecondsInput({ ...secondsInput, [u.email]: e.target.value })}
+                            style={{ width: 60, background: 'rgba(255,255,255,0.03)', border: '1px solid ' + colors.border, borderRadius: 6, padding: '6px 8px', color: colors.text, fontSize: 12, outline: 'none' }}
+                          />
+                          <button
+                            onClick={() => handleGrantPro(u.email)}
+                            disabled={updating === `${u.email}_pro`}
+                            style={{
+                              padding: '6px 12px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                              background: colors.green, color: '#000', opacity: updating === `${u.email}_pro` ? 0.5 : 1,
+                            }}
+                          >
+                            Grant Pro ({secondsInput[u.email] || 60}s)
+                          </button>
+                        </div>
+                      )}
+                    </td>
+
+                    <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: 13, color: isPro ? colors.green : colors.text }}>
                       {displayFreeUses}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      {canAdjust ? (
+
+                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                      {!isPro && !isOwner ? (
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                           <button
                             onClick={() => handleAdjustUses(u.email, 'remove_use')}
-                            disabled={updating === `${u.email}_remove_use` || !canAdjust}
+                            disabled={updating === `${u.email}_remove_use`}
                             style={{
                               width: 32, height: 28, borderRadius: 5, border: '1px solid ' + colors.border,
                               background: 'rgba(239, 68, 68, 0.1)', color: colors.red, fontSize: 14, cursor: 'pointer',
@@ -250,7 +321,7 @@ export default function AdminPage() {
                           >−</button>
                           <button
                             onClick={() => handleAdjustUses(u.email, 'add_use')}
-                            disabled={updating === `${u.email}_add_use` || !canAdjust}
+                            disabled={updating === `${u.email}_add_use`}
                             style={{
                               width: 32, height: 28, borderRadius: 5, border: '1px solid ' + colors.border,
                               background: 'rgba(34, 197, 94, 0.1)', color: colors.green, fontSize: 14, cursor: 'pointer',
@@ -262,7 +333,6 @@ export default function AdminPage() {
                         <span style={{ fontSize: 11, color: colors.textDim }}>—</span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 13, color: colors.textDim }}>{formatTime(u.created_at)}</td>
                   </tr>
                 );
               })}

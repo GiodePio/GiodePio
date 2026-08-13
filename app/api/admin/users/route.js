@@ -52,7 +52,7 @@ export async function GET(request) {
   try {
     const { data: proData } = await supabase
       .from('pro_users')
-      .select('email, is_pro, free_uses_remaining');
+      .select('email, is_pro, pro_expires_at, free_uses_remaining');
     if (proData) {
       for (const p of proData) {
         if (p.email) proUsersMap.set(p.email.toLowerCase(), p);
@@ -60,6 +60,7 @@ export async function GET(request) {
     }
   } catch (e) {}
 
+  const now = new Date();
   const userMap = new Map();
 
   for (const au of authUsersList) {
@@ -70,17 +71,55 @@ export async function GET(request) {
 
     const isOwner = isOwnerEmail(normEmail);
     let isPro = isOwner;
+    let proExpiresAt = null;
+    let remainingProSeconds = null;
     let freeUses = null;
 
     if (isOwner) {
       isPro = true;
       freeUses = null;
-    } else if (proRecord && typeof proRecord.is_pro === 'boolean') {
-      isPro = proRecord.is_pro;
-      freeUses = isPro ? null : (proRecord.free_uses_remaining ?? 3);
+    } else if (proRecord) {
+      if (proRecord.is_pro === false) {
+        isPro = false;
+        freeUses = proRecord.free_uses_remaining ?? 3;
+      } else if (proRecord.is_pro === true) {
+        if (proRecord.pro_expires_at) {
+          const exp = new Date(proRecord.pro_expires_at);
+          if (now < exp) {
+            isPro = true;
+            proExpiresAt = proRecord.pro_expires_at;
+            remainingProSeconds = Math.max(0, Math.floor((exp - now) / 1000));
+            freeUses = null;
+          } else {
+            isPro = false;
+            freeUses = proRecord.free_uses_remaining ?? 3;
+          }
+        } else {
+          isPro = true;
+          freeUses = null;
+        }
+      }
     } else if (meta && typeof meta.is_pro === 'boolean') {
-      isPro = meta.is_pro;
-      freeUses = isPro ? null : (meta.free_uses_remaining ?? 3);
+      if (meta.is_pro === false) {
+        isPro = false;
+        freeUses = meta.free_uses_remaining ?? 3;
+      } else {
+        if (meta.pro_expires_at) {
+          const exp = new Date(meta.pro_expires_at);
+          if (now < exp) {
+            isPro = true;
+            proExpiresAt = meta.pro_expires_at;
+            remainingProSeconds = Math.max(0, Math.floor((exp - now) / 1000));
+            freeUses = null;
+          } else {
+            isPro = false;
+            freeUses = meta.free_uses_remaining ?? 3;
+          }
+        } else {
+          isPro = true;
+          freeUses = null;
+        }
+      }
     } else {
       isPro = false;
       freeUses = 3;
@@ -91,6 +130,8 @@ export async function GET(request) {
       email: au.email,
       display_name: meta.full_name || au.email,
       is_pro: isPro,
+      pro_expires_at: proExpiresAt,
+      remaining_pro_seconds: remainingProSeconds,
       free_uses_remaining: freeUses,
       created_at: au.created_at,
       last_login_at: au.last_sign_in_at || null,
@@ -109,7 +150,7 @@ export async function POST(request) {
   }
 
   const body = await request.json();
-  const { email, is_pro } = body;
+  const { email, is_pro, duration_seconds } = body;
 
   if (!email || typeof is_pro !== 'boolean') {
     return NextResponse.json({ error: 'email and is_pro required' }, { status: 400 });
@@ -119,6 +160,11 @@ export async function POST(request) {
   const supabase = getClient();
   const freeUses = is_pro ? null : 3;
 
+  let proExpiresAt = null;
+  if (is_pro && typeof duration_seconds === 'number' && duration_seconds > 0) {
+    proExpiresAt = new Date(Date.now() + duration_seconds * 1000).toISOString();
+  }
+
   // 1. Upsert into pro_users table
   try {
     await supabase
@@ -126,6 +172,7 @@ export async function POST(request) {
       .upsert({
         email: normEmail,
         is_pro,
+        pro_expires_at: proExpiresAt,
         free_uses_remaining: freeUses,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'email' });
@@ -143,6 +190,7 @@ export async function POST(request) {
         user_metadata: {
           ...existingMeta,
           is_pro,
+          pro_expires_at: proExpiresAt,
           free_uses_remaining: freeUses,
         },
       });
@@ -157,7 +205,12 @@ export async function POST(request) {
       .ilike('email', normEmail);
   } catch (e) {}
 
-  return NextResponse.json({ ok: true, is_pro, free_uses_remaining: freeUses });
+  return NextResponse.json({
+    ok: true,
+    is_pro,
+    pro_expires_at: proExpiresAt,
+    free_uses_remaining: freeUses,
+  });
 }
 
 export async function PATCH(request) {
@@ -201,19 +254,18 @@ export async function PATCH(request) {
     const delta = action === 'add_use' ? 1 : -1;
     const newValue = Math.max(0, currentUses + delta);
 
-    // 1. Upsert into pro_users table
     try {
       await supabase
         .from('pro_users')
         .upsert({
           email: normEmail,
           is_pro: false,
+          pro_expires_at: null,
           free_uses_remaining: newValue,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'email' });
     } catch (e) {}
 
-    // 2. Update Auth metadata
     try {
       const { data: authData } = await supabase.auth.admin.listUsers();
       const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase() === normEmail);
@@ -222,18 +274,11 @@ export async function PATCH(request) {
           user_metadata: {
             ...targetAuth.user_metadata,
             is_pro: false,
+            pro_expires_at: null,
             free_uses_remaining: newValue,
           },
         });
       }
-    } catch (e) {}
-
-    // 3. Update DB users table
-    try {
-      await supabase
-        .from('users')
-        .update({ is_pro: false, free_uses_remaining: newValue, updated_at: new Date().toISOString() })
-        .ilike('email', normEmail);
     } catch (e) {}
 
     return NextResponse.json({ ok: true, free_uses_remaining: newValue });
