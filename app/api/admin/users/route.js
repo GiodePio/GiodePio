@@ -106,13 +106,14 @@ export async function POST(request) {
   } catch (e) {}
 
   // 1. Primary Write: public.users table in Supabase
+  // We DELIBERATELY omit pro_expires_at here because it does not exist in schema.sql for public.users
+  // This guarantees the update succeeds in Supabase so the user can visually see it.
   try {
     const updatePayload = {
       is_pro,
       free_uses_remaining: freeUses,
       updated_at: new Date().toISOString(),
     };
-    if (proExpiresAt !== undefined) updatePayload.pro_expires_at = proExpiresAt;
 
     const { data: updatedRows, error: updateErr } = await supabase
       .from('users')
@@ -125,7 +126,6 @@ export async function POST(request) {
         id: targetAuthId,
         email: normEmail,
         is_pro,
-        pro_expires_at: proExpiresAt,
         free_uses_remaining: freeUses,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'email' });
@@ -134,7 +134,7 @@ export async function POST(request) {
     console.error('Best-effort users table write:', e);
   }
 
-  // 2. Secondary Write: public.pro_users table (if table exists)
+  // 2. Secondary Write: public.pro_users table (this table HAS pro_expires_at)
   try {
     await supabase
       .from('pro_users')
@@ -210,7 +210,6 @@ export async function PATCH(request) {
         .from('users')
         .update({
           is_pro: false,
-          pro_expires_at: null,
           free_uses_remaining: newValue,
           updated_at: new Date().toISOString(),
         })
@@ -222,7 +221,6 @@ export async function PATCH(request) {
           id: targetAuthId,
           email: normEmail,
           is_pro: false,
-          pro_expires_at: null,
           free_uses_remaining: newValue,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'email' });
