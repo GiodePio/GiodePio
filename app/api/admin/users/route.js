@@ -97,17 +97,30 @@ export async function POST(request) {
     proExpiresAt = new Date(Date.now() + duration_seconds * 1000).toISOString();
   }
 
-  // Fetch target auth user ID to ensure upsert always works
-  let targetAuthId = null;
-  let targetAuth = null;
+  let proErr = null;
+
+  // 1. Upsert into public.pro_users table
+  try {
+    const { error } = await supabase
+      .from('pro_users')
+      .upsert({
+        email: normEmail,
+        is_pro,
+        pro_expires_at: proExpiresAt,
+        free_uses_remaining: freeUses,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'email' });
+    if (error) proErr = error.message;
+  } catch (e) {
+    proErr = e.message;
+  }
+
+  // 2. Update/upsert into public.users table
   try {
     const { data: authData } = await supabase.auth.admin.listUsers();
-    targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
-    if (targetAuth) targetAuthId = targetAuth.id;
-  } catch (e) {}
+    const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
+    const targetAuthId = targetAuth?.id;
 
-  // 1. Update public.users table in Supabase directly
-  try {
     const { data: updatedRows } = await supabase
       .from('users')
       .update({
@@ -129,35 +142,26 @@ export async function POST(request) {
         updated_at: new Date().toISOString(),
       }, { onConflict: 'email' });
     }
-  } catch (e) {
-    console.error('Failed to update/upsert public.users:', e);
-  }
-
-  // 2. Upsert into pro_users table
-  try {
-    await supabase
-      .from('pro_users')
-      .upsert({
-        email: normEmail,
-        is_pro,
-        pro_expires_at: proExpiresAt,
-        free_uses_remaining: freeUses,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'email' });
   } catch (e) {}
 
   // 3. Update Auth user_metadata
-  if (targetAuthId) {
-    try {
-      await supabase.auth.admin.updateUserById(targetAuthId, {
+  try {
+    const { data: authData } = await supabase.auth.admin.listUsers();
+    const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
+    if (targetAuth) {
+      await supabase.auth.admin.updateUserById(targetAuth.id, {
         user_metadata: {
-          ...(targetAuth?.user_metadata || {}),
+          ...(targetAuth.user_metadata || {}),
           is_pro,
           pro_expires_at: proExpiresAt,
           free_uses_remaining: freeUses,
         },
       });
-    } catch (e) {}
+    }
+  } catch (e) {}
+
+  if (proErr) {
+    return NextResponse.json({ error: `Supabase error: ${proErr}` }, { status: 500 });
   }
 
   const remainingProSeconds = proExpiresAt ? Math.max(0, Math.floor((new Date(proExpiresAt) - new Date()) / 1000)) : null;
@@ -195,16 +199,30 @@ export async function PATCH(request) {
     const delta = action === 'add_use' ? 1 : -1;
     const newValue = Math.max(0, currentUses + delta);
 
-    let targetAuthId = null;
-    let targetAuth = null;
+    let proErr = null;
+
+    // 1. Upsert pro_users table
+    try {
+      const { error } = await supabase
+        .from('pro_users')
+        .upsert({
+          email: normEmail,
+          is_pro: false,
+          pro_expires_at: null,
+          free_uses_remaining: newValue,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'email' });
+      if (error) proErr = error.message;
+    } catch (e) {
+      proErr = e.message;
+    }
+
+    // 2. Update public.users table
     try {
       const { data: authData } = await supabase.auth.admin.listUsers();
-      targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
-      if (targetAuth) targetAuthId = targetAuth.id;
-    } catch (e) {}
+      const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
+      const targetAuthId = targetAuth?.id;
 
-    // 1. Update public.users table in Supabase
-    try {
       const { data: updatedRows } = await supabase
         .from('users')
         .update({
@@ -228,31 +246,24 @@ export async function PATCH(request) {
       }
     } catch (e) {}
 
-    // 2. Upsert pro_users table
-    try {
-      await supabase
-        .from('pro_users')
-        .upsert({
-          email: normEmail,
-          is_pro: false,
-          pro_expires_at: null,
-          free_uses_remaining: newValue,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'email' });
-    } catch (e) {}
-
     // 3. Update Auth user_metadata
-    if (targetAuthId) {
-      try {
-        await supabase.auth.admin.updateUserById(targetAuthId, {
+    try {
+      const { data: authData } = await supabase.auth.admin.listUsers();
+      const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
+      if (targetAuth) {
+        await supabase.auth.admin.updateUserById(targetAuth.id, {
           user_metadata: {
-            ...(targetAuth?.user_metadata || {}),
+            ...(targetAuth.user_metadata || {}),
             is_pro: false,
             pro_expires_at: null,
             free_uses_remaining: newValue,
           },
         });
-      } catch (e) {}
+      }
+    } catch (e) {}
+
+    if (proErr) {
+      return NextResponse.json({ error: `Supabase error: ${proErr}` }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true, email: normEmail, free_uses_remaining: newValue });
