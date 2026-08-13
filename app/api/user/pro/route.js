@@ -30,15 +30,22 @@ function getClientAuth(request) {
 export async function GET(request) {
   const supabaseAuth = getClientAuth(request);
   const { data: { user } } = await supabaseAuth.auth.getUser();
-  if (!user) return NextResponse.json({ is_pro: false, free_uses_remaining: null });
+  if (!user) return NextResponse.json({ is_pro: false, free_uses_remaining: 3 });
 
   const supabase = getClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('users')
     .select('is_pro, free_uses_remaining')
     .eq('email', user.email)
     .single();
+
+  if (error || !data) {
+    if (user.email === 'lifegrading@gmail.com') {
+      return NextResponse.json({ is_pro: true, free_uses_remaining: null, trial_exhausted: false });
+    }
+    return NextResponse.json({ is_pro: false, free_uses_remaining: 3, trial_exhausted: false });
+  }
 
   return NextResponse.json({
     is_pro: data?.is_pro || false,
