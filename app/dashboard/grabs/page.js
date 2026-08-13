@@ -32,7 +32,7 @@ function NavItem({ icon, label, active, onClick }) {
 
 export default function GrabsPage() {
   const router = useRouter();
-  const [users, setUsers] = useState([]);
+  const [grabs, setGrabs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [userEmail, setUserEmail] = useState('');
