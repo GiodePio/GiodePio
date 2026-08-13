@@ -42,7 +42,7 @@ export async function GET(request) {
 
   return NextResponse.json({
     is_pro: data?.is_pro || false,
-    free_uses_remaining: data?.is_pro ? null : (data?.free_uses_remaining ?? 0),
-    trial_exhausted: !data?.is_pro && (data?.free_uses_remaining ?? 0) <= 0,
+    free_uses_remaining: data?.is_pro ? null : (data?.free_uses_remaining ?? 3),
+    trial_exhausted: !data?.is_pro && (data?.free_uses_remaining ?? 3) <= 0,
   });
 }
