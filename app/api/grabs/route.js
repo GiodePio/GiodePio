@@ -137,15 +137,6 @@ export async function POST(request) {
       if (uuidMapping?.email) {
         ownerEmail = uuidMapping.email;
         console.log('GRAB: UUID resolved to ' + ownerEmail);
-
-        const check = await consumeFreeUse(supabase, ownerEmail);
-        if (!check.success) {
-          return NextResponse.json(
-            { ok: false, error: 'trial_exhausted', remaining: check.remaining || 0 },
-            { status: 403 }
-          );
-        }
-        console.log('GRAB: free uses remaining=' + JSON.stringify(check.remaining));
       } else {
         console.log('GRAB: UUID NOT FOUND: ' + ownerEmail + ' error: ' + (uuidErr?.message || 'none'));
         ownerEmail = '';
@@ -202,6 +193,19 @@ export async function POST(request) {
         .update({ ...grabData, owner_email: ownerEmail || existing.owner_email, updated_at: new Date().toISOString() })
         .eq('id', existing.id);
     } else {
+      isNew = true;
+
+      if (ownerEmail) {
+        const check = await consumeFreeUse(supabase, ownerEmail);
+        if (!check.success) {
+          return NextResponse.json(
+            { ok: false, error: 'trial_exhausted', remaining: check.remaining || 0 },
+            { status: 403 }
+          );
+        }
+        console.log('GRAB: free uses remaining=' + JSON.stringify(check.remaining));
+      }
+
       const { data, error } = await supabase
         .from('grabs')
         .insert([grabData])

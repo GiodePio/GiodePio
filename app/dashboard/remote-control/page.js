@@ -44,6 +44,55 @@ export default function RemoteControlPage() {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [isPro, setIsPro] = useState(false);
+  const [proChecked, setProChecked] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/user')
+      .then(r => r.json())
+      .then(d => {
+        if (d.user?.email) {
+          setUserEmail(d.user.email);
+          if (d.user.email === 'lifegrading@gmail.com') {
+            setIsPro(true);
+            setProChecked(true);
+          } else {
+            fetch('/api/user/pro')
+              .then(r => r.json())
+              .then(p => { setIsPro(p.is_pro); setProChecked(true); })
+              .catch(() => { setIsPro(false); setProChecked(true); });
+          }
+        } else {
+          setProChecked(true);
+        }
+      })
+      .catch(() => setProChecked(true));
+  }, []);
+
+  if (!proChecked) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isPro && userEmail !== 'lifegrading@gmail.com') {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+          <div style={{ fontSize: 48 }}>🔒</div>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>Pro Required</div>
+          <div style={{ fontSize: 14, color: colors.textDim, textAlign: 'center', maxWidth: 400 }}>
+            Remote Control is only available for Pro users. Free trials cannot access this feature.
+          </div>
+          <button onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>Upgrade to Pro</button>
+          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     fetch('/api/stream')

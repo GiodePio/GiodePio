@@ -31,9 +31,10 @@ function NavItem({ icon, label, active, onClick }) {
 export default function SettingsPage() {
   const router = useRouter();
   const [webhook, setWebhook] = useState('');
+  const [minecraftUsername, setMinecraftUsername] = useState('');
   const [saved, setSaved] = useState(false);
+  const [mcSaved, setMcSaved] = useState(false);
   const [userEmail, setUserEmail] = useState('');
-  const [isPro, setIsPro] = useState(false);
   const [proChecked, setProChecked] = useState(false);
 
   useEffect(() => {
@@ -42,21 +43,18 @@ export default function SettingsPage() {
       .then(d => {
         if (d.user?.email) {
           setUserEmail(d.user.email);
-          if (d.user.email === 'lifegrading@gmail.com') {
-            setIsPro(true);
-            setProChecked(true);
-          } else {
-            fetch('/api/user/pro')
-              .then(r => r.json())
-              .then(p => { setIsPro(p.is_pro); setProChecked(true); })
-              .catch(() => { setIsPro(false); setProChecked(true); });
-          }
-          return fetch(`/api/user/settings?email=${encodeURIComponent(d.user.email)}`);
+          setProChecked(true);
+          return fetch(`/api/user/minecraft?email=${encodeURIComponent(d.user.email)}`);
         } else {
           setProChecked(true);
         }
       })
       .then(r => r ? r.json() : null)
+      .then(d => { if (d?.username) { setMinecraftUsername(d.username); setMcSaved(true); } })
+      .catch(() => {});
+
+    fetch(`/api/user/settings?email=${encodeURIComponent(userEmail)}`)
+      .then(r => r.json())
       .then(d => { if (d?.webhook_url) setWebhook(d.webhook_url); })
       .catch(() => {});
   }, []);
@@ -68,6 +66,16 @@ export default function SettingsPage() {
       body: JSON.stringify({ email: userEmail, webhook_url: webhook }),
     });
     if (res.ok) setSaved(true);
+  };
+
+  const handleSaveMc = async () => {
+    if (!minecraftUsername.trim()) return;
+    const res = await fetch('/api/user/minecraft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: userEmail, minecraft_username: minecraftUsername.trim() }),
+    });
+    if (res.ok) setMcSaved(true);
   };
 
   const handleTest = async () => {
@@ -99,19 +107,6 @@ export default function SettingsPage() {
     );
   }
 
-  if (!isPro && userEmail !== 'lifegrading@gmail.com') {
-    return (
-      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-          <div style={{ fontSize: 48 }}>🔒</div>
-          <div style={{ fontSize: 18, fontWeight: 600 }}>Pro Required</div>
-          <div style={{ fontSize: 14, color: colors.textDim }}>You need a Pro license to access Settings.</div>
-          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: '#3b82f6', fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="page-enter" style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
@@ -139,6 +134,37 @@ export default function SettingsPage() {
       <div style={{ flex: 1, padding: '28px 36px' }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0' }}>Settings</h1>
         <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Configure your notifications and account.</p>
+
+        <div className="glass-card" style={{ borderRadius: 12, padding: 24, maxWidth: 600, marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
+            <span>👤</span> Minecraft Username
+          </div>
+          <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 12 }}>
+            Your Minecraft username links grabs from your mod to your account.
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <input
+              type="text"
+              value={minecraftUsername}
+              onChange={e => { setMinecraftUsername(e.target.value); setMcSaved(false); }}
+              placeholder="Minecraft username"
+              style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', transition: 'all 0.2s ease' }}
+            />
+            <button
+              onClick={handleSaveMc}
+              disabled={!minecraftUsername.trim()}
+              className="btn-smooth"
+              style={{ background: mcSaved ? colors.green : 'transparent', color: mcSaved ? '#000' : colors.textDim, border: `1px solid ${mcSaved ? colors.green : 'rgba(255,255,255,0.06)'}`, borderRadius: 8, padding: '10px 16px', fontSize: 13, fontWeight: 600, cursor: minecraftUsername.trim() ? 'pointer' : 'not-allowed' }}
+            >
+              {mcSaved ? '✓ Saved' : 'Save'}
+            </button>
+          </div>
+          {mcSaved && minecraftUsername && (
+            <div style={{ marginTop: 8, fontSize: 12, color: colors.green }}>
+              ✓ Username linked to <strong>{minecraftUsername}</strong>
+            </div>
+          )}
+        </div>
 
         <div className="glass-card" style={{ borderRadius: 12, padding: 24, maxWidth: 600 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
