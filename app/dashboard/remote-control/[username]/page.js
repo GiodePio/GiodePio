@@ -45,10 +45,40 @@ export default function UserStreamPage() {
   const [chatInput, setChatInput] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
   const [sending, setSending] = useState(false);
+  const [isPro, setIsPro] = useState(false);
+  const [proChecked, setProChecked] = useState(false);
   const chatEndRef = useRef(null);
 
   useEffect(() => {
-    if (!username) return;
+    const checkPro = () => {
+      fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.json())
+        .then(p => { 
+          setIsPro(p.is_pro); 
+          setProChecked(true); 
+        })
+        .catch(() => { 
+          setIsPro(false); 
+          setProChecked(true); 
+        });
+    };
+
+    fetch('/api/auth/user')
+      .then(r => r.json())
+      .then(d => {
+        if (d.user?.email) {
+          checkPro();
+          const interval = setInterval(checkPro, 5000);
+          return () => clearInterval(interval);
+        } else {
+          setProChecked(true);
+        }
+      })
+      .catch(() => setProChecked(true));
+  }, []);
+
+  useEffect(() => {
+    if (!username || !proChecked || !isPro) return;
     const iv = setInterval(() => {
       fetch('/api/stream?username=' + encodeURIComponent(username))
         .then(r => r.json())
@@ -59,7 +89,7 @@ export default function UserStreamPage() {
         .catch(() => setOnline(false));
     }, 500);
     return () => clearInterval(iv);
-  }, [username]);
+  }, [username, proChecked, isPro]);
 
   useEffect(() => {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -86,6 +116,30 @@ export default function UserStreamPage() {
     { id: 'files', icon: '📁', label: 'File Explorer' },
     { id: 'tasks', icon: '⚡', label: 'Task Manager' },
   ];
+
+  if (!proChecked) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isPro) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#050508', color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+          <div style={{ fontSize: 48 }}>🔒</div>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>Pro Required</div>
+          <div style={{ fontSize: 14, color: colors.textDim, textAlign: 'center', maxWidth: 400 }}>
+            Remote Control streams are only available for Pro users. Free trials cannot access this feature.
+          </div>
+          <button onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>Upgrade to Pro</button>
+          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>

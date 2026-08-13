@@ -48,15 +48,28 @@ export default function RemoteControlPage() {
   const [proChecked, setProChecked] = useState(false);
 
   useEffect(() => {
+    const checkPro = () => {
+      fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.json())
+        .then(p => { 
+          setIsPro(p.is_pro); 
+          setProChecked(true); 
+        })
+        .catch(() => { 
+          setIsPro(false); 
+          setProChecked(true); 
+        });
+    };
+
     fetch('/api/auth/user')
       .then(r => r.json())
       .then(d => {
         if (d.user?.email) {
           setUserEmail(d.user.email);
-          fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' })
-            .then(r => r.json())
-            .then(p => { setIsPro(p.is_pro); setProChecked(true); })
-            .catch(() => { setIsPro(false); setProChecked(true); });
+          checkPro();
+          // Poll pro status every 5 seconds to instantly kick if revoked or expired
+          const interval = setInterval(checkPro, 5000);
+          return () => clearInterval(interval);
         } else {
           setProChecked(true);
         }
