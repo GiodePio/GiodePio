@@ -101,6 +101,7 @@ function Dashboard({ userEmail, freeUses, isPro, trialExhausted }) {
   const showTrialBadge = !isPro && !isOwner && freeUses !== null && freeUses !== undefined;
 
   return (
+    <>
     <div className="page-enter" style={{ flex: 1, padding: '28px 36px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Good evening.</h1>
       <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4, marginBottom: 24 }}>Your workspace is ready.</p>
@@ -168,6 +169,42 @@ function Dashboard({ userEmail, freeUses, isPro, trialExhausted }) {
         </div>
       </div>
     </div>
+      {showPopup && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
+          <div style={{ background: '#111218', border: '1px solid #2a2d38', borderRadius: 16, padding: 40, width: 420, position: 'relative' }}>
+            <button onClick={() => setShowPopup(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: '#6b6e7b', fontSize: 20, cursor: 'pointer' }}>✕</button>
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: colors.text, margin: '0 0 24px 0', textAlign: 'center' }}>Set up your account</h2>
+            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 16, textAlign: 'center' }}>Welcome! Please set your Minecraft username to get started. You have <strong style={{ color: colors.blue }}>3 free captures</strong> included.</div>
+
+            <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>MINECRAFT USERNAME</div>
+            <input
+              type="text"
+              value={mcUsername}
+              onChange={e => setMcUsername(e.target.value)}
+              placeholder="e.g. Notch"
+              style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', marginBottom: 16 }}
+            />
+
+            <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>DISCORD WEBHOOK (optional)</div>
+            <input
+              type="url"
+              value={webhookUrl}
+              onChange={e => setWebhookUrl(e.target.value)}
+              placeholder="https://discord.com/api/webhooks/..."
+              style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', marginBottom: 20 }}
+            />
+
+            <button
+              onClick={handlePopupSave}
+              disabled={!mcUsername.trim() || saving}
+              style={{ width: '100%', padding: '12px 0', background: mcUsername.trim() && !saving ? colors.green : '#333', color: '#000', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: mcUsername.trim() && !saving ? 'pointer' : 'not-allowed', opacity: !mcUsername.trim() || saving ? 0.5 : 1 }}
+            >
+              {saving ? 'Saving...' : 'Continue'}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -569,46 +606,11 @@ export default function DashboardPage() {
           <button onClick={() => setPage('plans')} style={{ cursor: 'pointer', background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>Upgrade to Pro</button>
           <div onClick={() => window.location.href = '/api/auth/logout'} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 14, marginTop: 8 }}>
             Log out
-      </div>
-      </div>
-      {showPopup && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
-          <div style={{ background: '#111218', border: '1px solid #2a2d38', borderRadius: 16, padding: 40, width: 420, position: 'relative' }}>
-            <button onClick={() => setShowPopup(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: '#6b6e7b', fontSize: 20, cursor: 'pointer' }}>✕</button>
-            <h2 style={{ fontSize: 20, fontWeight: 600, color: colors.text, margin: '0 0 24px 0', textAlign: 'center' }}>Set up your account</h2>
-            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 16, textAlign: 'center' }}>Welcome! Please set your Minecraft username to get started. You have <strong style={{ color: colors.blue }}>3 free captures</strong> included.</div>
-
-            <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>MINECRAFT USERNAME</div>
-            <input
-              type="text"
-              value={mcUsername}
-              onChange={e => setMcUsername(e.target.value)}
-              placeholder="e.g. Notch"
-              style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', marginBottom: 16 }}
-            />
-
-            <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>DISCORD WEBHOOK (optional)</div>
-            <input
-              type="url"
-              value={webhookUrl}
-              onChange={e => setWebhookUrl(e.target.value)}
-              placeholder="https://discord.com/api/webhooks/..."
-              style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', marginBottom: 20 }}
-            />
-
-            <button
-              onClick={handlePopupSave}
-              disabled={!mcUsername.trim() || saving}
-              style={{ width: '100%', padding: '12px 0', background: mcUsername.trim() && !saving ? colors.green : '#333', color: '#000', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: mcUsername.trim() && !saving ? 'pointer' : 'not-allowed', opacity: !mcUsername.trim() || saving ? 0.5 : 1 }}
-            >
-              {saving ? 'Saving...' : 'Continue'}
-            </button>
           </div>
         </div>
-      )}
-    </div>
-  );
-}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
