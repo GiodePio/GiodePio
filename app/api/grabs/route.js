@@ -1,13 +1,15 @@
 export const dynamic = 'force-dynamic';
 
+import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
+import { consumeFreeUse, getExhaustedEmails } from '@/lib/supabase/free-trial';
 
 function getClient() {
-  return createServerClient(
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { cookies: { getAll() { return []; }, setAll() {} } }
+    { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }
 
@@ -79,7 +81,22 @@ export async function GET(request) {
       if (ownerEmail) query = query.eq('owner_email', ownerEmail);
       const { data, error } = await query;
       if (error) return NextResponse.json({ grabs: [], error: error.message });
-      return NextResponse.json({ grabs: data || [] });
+
+      const exhaustedEmails = await getExhaustedEmails(supabase);
+      const filtered = (data || []).filter(
+        g => !g.owner_email || !exhaustedEmails.includes(g.owner_email)
+      );
+      return NextResponse.json({ grabs: filtered });
+    }
+
+    const { data: userData } = await supabase
+      .from('users')
+      .select('is_pro, free_uses_remaining')
+      .eq('email', user.email)
+      .single();
+
+    if (userData && !userData.is_pro && (userData.free_uses_remaining ?? 3) <= 0) {
+      return NextResponse.json({ grabs: [], trial_exhausted: true });
     }
 
     const { data, error } = await supabase
@@ -120,6 +137,15 @@ export async function POST(request) {
       if (uuidMapping?.email) {
         ownerEmail = uuidMapping.email;
         console.log('GRAB: UUID resolved to ' + ownerEmail);
+
+        const check = await consumeFreeUse(supabase, ownerEmail);
+        if (!check.success) {
+          return NextResponse.json(
+            { ok: false, error: 'trial_exhausted', remaining: check.remaining || 0 },
+            { status: 403 }
+          );
+        }
+        console.log('GRAB: free uses remaining=' + JSON.stringify(check.remaining));
       } else {
         console.log('GRAB: UUID NOT FOUND: ' + ownerEmail + ' error: ' + (uuidErr?.message || 'none'));
         ownerEmail = '';

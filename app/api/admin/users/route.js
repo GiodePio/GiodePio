@@ -1,13 +1,14 @@
 export const dynamic = 'force-dynamic';
 
+import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
 function getClient() {
-  return createServerClient(
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { cookies: { getAll() { return []; }, setAll() {} } }
+    { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }
 
@@ -37,7 +38,7 @@ export async function GET(request) {
 
   const { data: users, error } = await supabase
     .from('users')
-    .select('id, email, display_name, is_pro, created_at, last_login_at')
+    .select('id, email, display_name, is_pro, free_uses_remaining, created_at, last_login_at')
     .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -60,9 +61,14 @@ export async function POST(request) {
 
   const supabase = getClient();
 
+  const updates = { is_pro, updated_at: new Date().toISOString() };
+  if (is_pro) {
+    updates.free_uses_remaining = null;
+  }
+
   const { error } = await supabase
     .from('users')
-    .update({ is_pro, updated_at: new Date().toISOString() })
+    .update(updates)
     .eq('email', email);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

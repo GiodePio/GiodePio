@@ -10,6 +10,8 @@ const colors = {
   text: '#f0f0f0',
   textDim: '#6b6e7b',
   green: '#22c55e',
+  blue: '#3b82f6',
+  red: '#ef4444',
 };
 
 function NavItem({ icon, label, active, onClick }) {
@@ -30,11 +32,13 @@ function NavItem({ icon, label, active, onClick }) {
 
 export default function GrabsPage() {
   const router = useRouter();
-  const [grabs, setGrabs] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [isPro, setIsPro] = useState(false);
+  const [freeUses, setFreeUses] = useState(null);
+  const [trialExhausted, setTrialExhausted] = useState(false);
   const [proChecked, setProChecked] = useState(false);
   const [, setTick] = useState(0);
 
@@ -55,12 +59,17 @@ export default function GrabsPage() {
             const url = '/api/grabs';
             return fetch(url);
           } else {
-            fetch('/api/user/pro')
+            return fetch('/api/user/pro')
               .then(r => r.json())
-              .then(p => { setIsPro(p.is_pro); setProChecked(true); })
-              .catch(() => { setIsPro(false); setProChecked(true); });
-            const url = `/api/grabs?owner_email=${encodeURIComponent(d.user.email)}`;
-            return fetch(url);
+              .then(p => {
+                setIsPro(p.is_pro);
+                setFreeUses(p.free_uses_remaining);
+                setTrialExhausted(p.trial_exhausted || false);
+                setProChecked(true);
+                const url = `/api/grabs?owner_email=${encodeURIComponent(d.user.email)}`;
+                return fetch(url);
+              })
+              .catch(() => { setIsPro(false); setProChecked(true); return null; });
           }
         }
         setLoading(false);
@@ -102,14 +111,39 @@ export default function GrabsPage() {
     );
   }
 
-  if (!isPro && userEmail !== 'lifegrading@gmail.com') {
+  const isOwner = userEmail === 'lifegrading@gmail.com';
+  const canAccess = isPro || isOwner || freeUses > 0;
+
+  if (!canAccess && !isOwner) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
+            <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
+          </div>
+          <div style={{ flex: 1 }}>
+            <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
+            <NavItem icon="⚡" label="Grabs" active onClick={() => {}} />
+            <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
+            <NavItem icon="📋" label="Plans" onClick={() => router.push('/dashboard')} />
+            <NavItem icon="⭐" label="+Rep" onClick={() => router.push('/dashboard')} />
+            <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
+            <NavItem icon="🖥" label="Remote Control" onClick={() => router.push('/dashboard/remote-control')} />
+          </div>
+          <div>
+            <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
+            <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
+          </div>
+        </aside>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
           <div style={{ fontSize: 48 }}>🔒</div>
-          <div style={{ fontSize: 18, fontWeight: 600 }}>Pro Required</div>
-          <div style={{ fontSize: 14, color: colors.textDim }}>You need a Pro license to access Grabs.</div>
-          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: '#3b82f6', fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>Free Trial Exhausted</div>
+          <div style={{ fontSize: 14, color: colors.textDim, textAlign: 'center', maxWidth: 400 }}>
+            You have used all 3 free captures. Upgrade to Pro for unlimited access to grabs and captures.
+          </div>
+          <button onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>Upgrade to Pro</button>
+          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: colors.blue, fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
         </div>
       </div>
     );
@@ -126,7 +160,7 @@ export default function GrabsPage() {
           <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
           <NavItem icon="⚡" label="Grabs" active onClick={() => {}} />
           <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
-          {userEmail === 'lifegrading@gmail.com' && (
+          {isOwner && (
             <NavItem icon="👥" label="Admin" onClick={() => router.push('/admin')} />
           )}
           <NavItem icon="📋" label="Plans" onClick={() => router.push('/dashboard')} />
@@ -143,6 +177,11 @@ export default function GrabsPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <span style={{ fontSize: 24, fontWeight: 700 }}>Grabs</span>
           <span style={{ color: colors.textDim, fontSize: 14 }}>{grabs.length} captured</span>
+          {!isPro && !isOwner && freeUses !== null && freeUses !== undefined && (
+            <span style={{ color: colors.blue, fontSize: 12, background: 'rgba(59, 130, 246, 0.1)', padding: '2px 8px', borderRadius: 6 }}>
+              Free Trial: {freeUses} left
+            </span>
+          )}
         </div>
         <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'flex-end' }}>
           <input

