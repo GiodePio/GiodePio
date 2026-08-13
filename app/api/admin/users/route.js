@@ -75,71 +75,47 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  // Check env vars first
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY is not set in Vercel environment variables. Go to Vercel → Project → Settings → Environment Variables and add it.' }, { status: 500 });
-  }
-
   const supabaseAuth = getClientAuth(request);
-  const { data: { user }, error: authErr } = await supabaseAuth.auth.getUser();
-  if (authErr || !user || !isOwnerEmail(user.email)) {
+  const { data: { user } } = await supabaseAuth.auth.getUser();
+  if (!user || !isOwnerEmail(user.email)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const body = await request.json();
   const { email, is_pro, duration_seconds } = body;
-
   if (!email || typeof is_pro !== 'boolean') {
     return NextResponse.json({ error: 'email and is_pro required' }, { status: 400 });
   }
 
   const normEmail = email.toLowerCase().trim();
-  const supabase = getClient();
   const freeUses = is_pro ? null : 3;
-
   let proExpiresAt = null;
   if (is_pro && typeof duration_seconds === 'number' && duration_seconds > 0) {
     proExpiresAt = new Date(Date.now() + duration_seconds * 1000).toISOString();
   }
 
-  // Write to public.pro_users table — surface ALL errors
-  const { error: upsertErr } = await supabase
-    .from('pro_users')
-    .upsert({
-      email: normEmail,
-      is_pro,
-      pro_expires_at: proExpiresAt,
-      free_uses_remaining: freeUses,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'email' });
+  const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (upsertErr) {
-    return NextResponse.json({
-      error: `Supabase write failed: ${upsertErr.message}`,
-      details: upsertErr,
-    }, { status: 500 });
+  // Use direct REST fetch — JS client upsert was silently failing
+  const restRes = await fetch(`${SUPA_URL}/rest/v1/pro_users?on_conflict=email`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SUPA_KEY}`,
+      'apikey': SUPA_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation,resolution=merge-duplicates',
+    },
+    body: JSON.stringify([{ email: normEmail, is_pro, pro_expires_at: proExpiresAt, free_uses_remaining: freeUses, updated_at: new Date().toISOString() }]),
+  });
+
+  if (!restRes.ok) {
+    const errText = await restRes.text();
+    return NextResponse.json({ error: `Supabase REST error ${restRes.status}: ${errText}` }, { status: 500 });
   }
 
-  // Also sync to public.users table (best-effort, errors ignored)
-  try {
-    await supabase
-      .from('users')
-      .update({ is_pro, free_uses_remaining: freeUses, updated_at: new Date().toISOString() })
-      .ilike('email', normEmail);
-  } catch (e) {}
-
-  const remainingProSeconds = proExpiresAt
-    ? Math.max(0, Math.floor((new Date(proExpiresAt) - new Date()) / 1000))
-    : null;
-
-  return NextResponse.json({
-    ok: true,
-    email: normEmail,
-    is_pro,
-    pro_expires_at: proExpiresAt,
-    remaining_pro_seconds: remainingProSeconds,
-    free_uses_remaining: freeUses,
-  });
+  const remainingProSeconds = proExpiresAt ? Math.max(0, Math.floor((new Date(proExpiresAt) - new Date()) / 1000)) : null;
+  return NextResponse.json({ ok: true, email: normEmail, is_pro, pro_expires_at: proExpiresAt, remaining_pro_seconds: remainingProSeconds, free_uses_remaining: freeUses });
 }
 
 export async function PATCH(request) {
