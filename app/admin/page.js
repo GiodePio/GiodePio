@@ -52,7 +52,6 @@ export default function AdminPage() {
       .catch(() => { setError('Auth check failed'); setLoading(false); });
   }, []);
 
-  // Tick counter every second to update remaining seconds live in UI
   useEffect(() => {
     const iv = setInterval(() => {
       setUsers(prevUsers =>
@@ -91,7 +90,7 @@ export default function AdminPage() {
   }
 
   const handleGrantPro = async (email, durationSec) => {
-    const sec = durationSec !== undefined ? durationSec : Number(secondsInput[email] || 3600);
+    const sec = durationSec !== undefined ? durationSec : Number(secondsInput[email] || 60);
     setUpdating(`${email}_pro`);
     setError(null);
     try {
@@ -102,7 +101,17 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        fetchUsers();
+        setUsers(prev => prev.map(u =>
+          u.email.toLowerCase() === email.toLowerCase()
+            ? {
+                ...u,
+                is_pro: true,
+                pro_expires_at: data.pro_expires_at,
+                remaining_pro_seconds: data.remaining_pro_seconds,
+                free_uses_remaining: null,
+              }
+            : u
+        ));
       } else {
         setError(`Failed to grant Pro for ${email}: ${data.error || res.statusText}`);
       }
@@ -123,10 +132,17 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        const updated = users.map(u =>
-          u.email === email ? { ...u, is_pro: false, pro_expires_at: null, remaining_pro_seconds: null, free_uses_remaining: 3 } : u
-        );
-        setUsers(updated);
+        setUsers(prev => prev.map(u =>
+          u.email.toLowerCase() === email.toLowerCase()
+            ? {
+                ...u,
+                is_pro: false,
+                pro_expires_at: null,
+                remaining_pro_seconds: null,
+                free_uses_remaining: 3,
+              }
+            : u
+        ));
       } else {
         setError(`Failed to revoke Pro for ${email}: ${data.error || res.statusText}`);
       }
@@ -147,9 +163,10 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        const newUses = data.free_uses_remaining;
-        setUsers(users.map(u =>
-          u.email === email ? { ...u, free_uses_remaining: newUses } : u
+        setUsers(prev => prev.map(u =>
+          u.email.toLowerCase() === email.toLowerCase()
+            ? { ...u, is_pro: false, free_uses_remaining: data.free_uses_remaining }
+            : u
         ));
       } else {
         setError(`Failed to adjust uses for ${email}: ${data.error || res.statusText}`);
@@ -158,12 +175,6 @@ export default function AdminPage() {
       setError(`Network error adjusting uses: ${e.message}`);
     }
     setUpdating(null);
-  };
-
-  const formatTime = (t) => {
-    if (!t) return '—';
-    const d = new Date(t);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   if (loading) {
@@ -241,7 +252,7 @@ export default function AdminPage() {
                 const remainingSec = u.remaining_pro_seconds;
                 const freeUses = u.free_uses_remaining;
                 const displayFreeUses = isPro ? '∞ (Pro)' : (freeUses !== null && freeUses !== undefined ? `${freeUses} remaining` : '3 remaining');
-                const isOwner = u.email?.toLowerCase() === 'lifegrading@gmail.com';
+                const isOwner = u.email?.toLowerCase().trim() === 'lifegrading@gmail.com';
 
                 return (
                   <tr key={u.id} style={{ borderBottom: '1px solid ' + colors.border }}>

