@@ -80,8 +80,26 @@ export async function GET(request) {
     const authUser = authUsersMap[u.email];
     const meta = authUser?.user_metadata || {};
     const isOwner = u.email === 'lifegrading@gmail.com';
-    const isPro = isOwner || u.is_pro === true || meta.is_pro === true;
-    const freeUses = isPro ? null : (u.free_uses_remaining ?? meta.free_uses_remaining ?? 3);
+
+    let isPro = isOwner;
+    if (isOwner) {
+      isPro = true;
+    } else if (typeof meta.is_pro === 'boolean') {
+      isPro = meta.is_pro;
+    } else if (typeof u.is_pro === 'boolean') {
+      isPro = u.is_pro;
+    }
+
+    let freeUses = null;
+    if (!isPro) {
+      if (typeof meta.free_uses_remaining === 'number') {
+        freeUses = meta.free_uses_remaining;
+      } else if (typeof u.free_uses_remaining === 'number') {
+        freeUses = u.free_uses_remaining;
+      } else {
+        freeUses = 3;
+      }
+    }
 
     return {
       ...u,
@@ -110,16 +128,17 @@ export async function POST(request) {
 
   const supabase = getClient();
 
-  // 1. Always update Auth user_metadata
+  // 1. Update Auth user_metadata
   try {
     const { data: authData } = await supabase.auth.admin.listUsers();
     const targetAuth = authData?.users?.find(u => u.email === email);
     if (targetAuth) {
+      const existingMeta = targetAuth.user_metadata || {};
       await supabase.auth.admin.updateUserById(targetAuth.id, {
         user_metadata: {
-          ...targetAuth.user_metadata,
+          ...existingMeta,
           is_pro,
-          free_uses_remaining: is_pro ? null : 3,
+          free_uses_remaining: is_pro ? null : (existingMeta.free_uses_remaining ?? 3),
         },
       });
     }
@@ -160,35 +179,35 @@ export async function PATCH(request) {
 
   if (action === 'add_use' || action === 'remove_use') {
     let currentUses = 3;
-    let authUser = null;
+    let targetAuth = null;
 
     try {
       const { data: authData } = await supabase.auth.admin.listUsers();
-      authUser = authData?.users?.find(u => u.email === email);
-      if (authUser?.user_metadata?.free_uses_remaining !== undefined && authUser?.user_metadata?.free_uses_remaining !== null) {
-        currentUses = authUser.user_metadata.free_uses_remaining;
-      }
-    } catch (e) {}
-
-    try {
-      const { data: current } = await supabase
-        .from('users')
-        .select('free_uses_remaining')
-        .eq('email', email)
-        .single();
-      if (current?.free_uses_remaining !== undefined && current?.free_uses_remaining !== null) {
-        currentUses = current.free_uses_remaining;
+      targetAuth = authData?.users?.find(u => u.email === email);
+      const meta = targetAuth?.user_metadata || {};
+      if (typeof meta.free_uses_remaining === 'number') {
+        currentUses = meta.free_uses_remaining;
+      } else {
+        const { data: dbUser } = await supabase
+          .from('users')
+          .select('free_uses_remaining')
+          .eq('email', email)
+          .single();
+        if (typeof dbUser?.free_uses_remaining === 'number') {
+          currentUses = dbUser.free_uses_remaining;
+        }
       }
     } catch (e) {}
 
     const delta = action === 'add_use' ? 1 : -1;
     const newValue = Math.max(0, currentUses + delta);
 
-    if (authUser) {
+    if (targetAuth) {
       try {
-        await supabase.auth.admin.updateUserById(authUser.id, {
+        await supabase.auth.admin.updateUserById(targetAuth.id, {
           user_metadata: {
-            ...authUser.user_metadata,
+            ...targetAuth.user_metadata,
+            is_pro: false,
             free_uses_remaining: newValue,
           },
         });
@@ -198,7 +217,7 @@ export async function PATCH(request) {
     try {
       await supabase
         .from('users')
-        .update({ free_uses_remaining: newValue, updated_at: new Date().toISOString() })
+        .update({ is_pro: false, free_uses_remaining: newValue, updated_at: new Date().toISOString() })
         .eq('email', email);
     } catch (e) {}
 

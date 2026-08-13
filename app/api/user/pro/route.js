@@ -37,15 +37,15 @@ export async function GET(request) {
   }
 
   const supabase = getClient();
-  let isPro = user.user_metadata?.is_pro || false;
-  let freeUses = user.user_metadata?.free_uses_remaining ?? 3;
+  let isPro = false;
+  let freeUses = 3;
 
   try {
     const { data: authData } = await supabase.auth.admin.getUserById(user.id);
-    if (authData?.user?.user_metadata) {
-      const meta = authData.user.user_metadata;
-      if (meta.is_pro !== undefined && meta.is_pro !== null) isPro = meta.is_pro;
-      if (meta.free_uses_remaining !== undefined && meta.free_uses_remaining !== null) freeUses = meta.free_uses_remaining;
+    const meta = authData?.user?.user_metadata;
+    if (meta) {
+      if (typeof meta.is_pro === 'boolean') isPro = meta.is_pro;
+      if (typeof meta.free_uses_remaining === 'number') freeUses = meta.free_uses_remaining;
     }
   } catch (e) {}
 
@@ -57,8 +57,10 @@ export async function GET(request) {
       .single();
 
     if (data) {
-      if (data.is_pro !== undefined && data.is_pro !== null) isPro = data.is_pro;
-      if (data.free_uses_remaining !== undefined && data.free_uses_remaining !== null) freeUses = data.free_uses_remaining;
+      if (data.is_pro === true) isPro = true;
+      if (!isPro && typeof data.free_uses_remaining === 'number') {
+        freeUses = data.free_uses_remaining;
+      }
     }
   } catch (e) {}
 
