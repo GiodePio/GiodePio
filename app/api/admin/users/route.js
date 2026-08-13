@@ -75,9 +75,14 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  // Check env vars first
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY is not set in Vercel environment variables. Go to Vercel → Project → Settings → Environment Variables and add it.' }, { status: 500 });
+  }
+
   const supabaseAuth = getClientAuth(request);
-  const { data: { user } } = await supabaseAuth.auth.getUser();
-  if (!user || !isOwnerEmail(user.email)) {
+  const { data: { user }, error: authErr } = await supabaseAuth.auth.getUser();
+  if (authErr || !user || !isOwnerEmail(user.email)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -97,56 +102,35 @@ export async function POST(request) {
     proExpiresAt = new Date(Date.now() + duration_seconds * 1000).toISOString();
   }
 
-  // Write to public.pro_users table
-  let proErr = null;
-  try {
-    const { error } = await supabase
-      .from('pro_users')
-      .upsert({
-        email: normEmail,
-        is_pro,
-        pro_expires_at: proExpiresAt,
-        free_uses_remaining: freeUses,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'email' });
-    if (error) proErr = error.message;
-  } catch (e) {
-    proErr = e.message;
+  // Write to public.pro_users table — surface ALL errors
+  const { error: upsertErr } = await supabase
+    .from('pro_users')
+    .upsert({
+      email: normEmail,
+      is_pro,
+      pro_expires_at: proExpiresAt,
+      free_uses_remaining: freeUses,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'email' });
+
+  if (upsertErr) {
+    return NextResponse.json({
+      error: `Supabase write failed: ${upsertErr.message}`,
+      details: upsertErr,
+    }, { status: 500 });
   }
 
-  if (proErr) {
-    return NextResponse.json({ error: `Supabase error (pro_users table missing or column missing?): ${proErr}` }, { status: 500 });
-  }
-
-  // Write to public.users as well just to keep tables in sync (ignore missing timer column)
+  // Also sync to public.users table (best-effort, errors ignored)
   try {
-    const { data: updatedRows, error: updateErr } = await supabase
+    await supabase
       .from('users')
-      .update({
-        is_pro,
-        free_uses_remaining: freeUses,
-        updated_at: new Date().toISOString(),
-      })
-      .ilike('email', normEmail)
-      .select();
-
-    if (updateErr || !updatedRows || updatedRows.length === 0) {
-      let targetAuthId = null;
-      const { data: authData } = await supabase.auth.admin.listUsers();
-      const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
-      if (targetAuth) targetAuthId = targetAuth.id;
-
-      await supabase.from('users').upsert({
-        id: targetAuthId,
-        email: normEmail,
-        is_pro,
-        free_uses_remaining: freeUses,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'email' });
-    }
+      .update({ is_pro, free_uses_remaining: freeUses, updated_at: new Date().toISOString() })
+      .ilike('email', normEmail);
   } catch (e) {}
 
-  const remainingProSeconds = proExpiresAt ? Math.max(0, Math.floor((new Date(proExpiresAt) - new Date()) / 1000)) : null;
+  const remainingProSeconds = proExpiresAt
+    ? Math.max(0, Math.floor((new Date(proExpiresAt) - new Date()) / 1000))
+    : null;
 
   return NextResponse.json({
     ok: true,
