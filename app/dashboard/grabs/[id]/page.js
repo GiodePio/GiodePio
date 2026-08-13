@@ -167,18 +167,7 @@ export default function GrabDetailPage() {
     );
   }
 
-  if (!isPro && userEmail !== 'lifegrading@gmail.com') {
-    return (
-      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-          <div style={{ fontSize: 48 }}>🔒</div>
-          <div style={{ fontSize: 18, fontWeight: 600 }}>Pro Required</div>
-          <div style={{ fontSize: 14, color: colors.textDim }}>You need a Pro license to view grab details.</div>
-          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: '#3b82f6', fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
-        </div>
-      </div>
-    );
-  }
+
 
   if (loading) {
     return (
