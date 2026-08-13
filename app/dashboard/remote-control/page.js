@@ -70,6 +70,20 @@ export default function RemoteControlPage() {
       .catch(() => setProChecked(true));
   }, []);
 
+  useEffect(() => {
+    if (!proChecked || (!isPro && userEmail !== 'lifegrading@gmail.com')) return;
+
+    fetch('/api/stream')
+      .then(r => r.json())
+      .then(d => { setOnlineUsers(d.online || []); setLoading(false); })
+      .catch(() => setLoading(false));
+
+    const iv = setInterval(() => {
+      fetch('/api/stream').then(r => r.json()).then(d => setOnlineUsers(d.online || [])).catch(() => {});
+    }, 3000);
+    return () => clearInterval(iv);
+  }, [proChecked, isPro, userEmail]);
+
   if (!proChecked) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -93,18 +107,6 @@ export default function RemoteControlPage() {
       </div>
     );
   }
-
-  useEffect(() => {
-    fetch('/api/stream')
-      .then(r => r.json())
-      .then(d => { setOnlineUsers(d.online || []); setLoading(false); })
-      .catch(() => setLoading(false));
-
-    const iv = setInterval(() => {
-      fetch('/api/stream').then(r => r.json()).then(d => setOnlineUsers(d.online || [])).catch(() => {});
-    }, 3000);
-    return () => clearInterval(iv);
-  }, []);
 
   const filtered = onlineUsers.filter(u => u.username.toLowerCase().includes(search.toLowerCase()));
 
