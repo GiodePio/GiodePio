@@ -47,6 +47,8 @@ export default function BuildPage() {
   const [buildStep, setBuildStep] = useState(-1);
   const [buildDone, setBuildDone] = useState(false);
   const [isPro, setIsPro] = useState(false);
+  const [freeUses, setFreeUses] = useState(null);
+  const [trialExhausted, setTrialExhausted] = useState(false);
   const [proChecked, setProChecked] = useState(false);
 
   useEffect(() => {
@@ -63,7 +65,12 @@ export default function BuildPage() {
           } else {
             fetch('/api/user/pro')
               .then(r => r.json())
-              .then(p => { setIsPro(p.is_pro); setProChecked(true); })
+              .then(p => {
+                setIsPro(p.is_pro);
+                setFreeUses(p.free_uses_remaining);
+                setTrialExhausted(p.trial_exhausted || false);
+                setProChecked(true);
+              })
               .catch(() => { setIsPro(false); setProChecked(true); });
           }
         } else {
@@ -130,14 +137,19 @@ export default function BuildPage() {
     );
   }
 
-  if (!isPro && userEmail !== 'lifegrading@gmail.com') {
+  const canAccessBuild = isPro || freeUses > 0;
+
+  if (!canAccessBuild && userEmail !== 'lifegrading@gmail.com') {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
           <div style={{ fontSize: 48 }}>🔒</div>
           <div style={{ fontSize: 18, fontWeight: 600 }}>Pro Required</div>
-          <div style={{ fontSize: 14, color: colors.textDim }}>You need a Pro license to access Build.</div>
-          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: '#3b82f6', fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
+          <div style={{ fontSize: 14, color: colors.textDim, textAlign: 'center', maxWidth: 400 }}>
+            You need a Pro license to access Build.
+          </div>
+          <button onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>Upgrade to Pro</button>
+          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
         </div>
       </div>
     );

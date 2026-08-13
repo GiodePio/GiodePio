@@ -62,11 +62,6 @@ export async function POST(request) {
   const supabase = getClient();
 
   const updates = { is_pro, updated_at: new Date().toISOString() };
-  if (is_pro) {
-    updates.free_uses_remaining = null;
-  } else {
-    updates.free_uses_remaining = 0;
-  }
 
   const { error } = await supabase
     .from('users')
@@ -75,4 +70,57 @@ export async function POST(request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
+}
+
+export async function PATCH(request) {
+  const supabaseAuth = getClientAuth(request);
+  const { data: { user } } = await supabaseAuth.auth.getUser();
+  if (!user || user.email !== 'lifegrading@gmail.com') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const { email, action } = body;
+
+  if (!email || !action) {
+    return NextResponse.json({ error: 'email and action required' }, { status: 400 });
+  }
+
+  const supabase = getClient();
+
+  if (action === 'add_use') {
+    const { data: current, error: fetchError } = await supabase
+      .from('users')
+      .select('free_uses_remaining')
+      .eq('email', email)
+      .single();
+    if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+
+    const newValue = (current?.free_uses_remaining ?? 0) + 1;
+    const { error } = await supabase
+      .from('users')
+      .update({ free_uses_remaining: newValue, updated_at: new Date().toISOString() })
+      .eq('email', email);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, free_uses_remaining: newValue });
+  }
+
+  if (action === 'remove_use') {
+    const { data: current, error: fetchError } = await supabase
+      .from('users')
+      .select('free_uses_remaining')
+      .eq('email', email)
+      .single();
+    if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
+
+    const newValue = Math.max(0, (current?.free_uses_remaining ?? 0) - 1);
+    const { error } = await supabase
+      .from('users')
+      .update({ free_uses_remaining: newValue, updated_at: new Date().toISOString() })
+      .eq('email', email);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, free_uses_remaining: newValue });
+  }
+
+  return NextResponse.json({ error: 'invalid action' }, { status: 400 });
 }

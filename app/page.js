@@ -142,7 +142,7 @@ function Pricing() {
               <span style={{ color: colors.green, fontWeight: 'bold' }}>✓</span> {feat}
             </div>
           ))}
-          <button disabled style={{ width: '100%', marginTop: 24, padding: '14px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, opacity: 0.5, cursor: 'not-allowed' }}>Upgrade for $5/mo</button>
+          <button onClick={() => window.location.href = 'https://buy.stripe.com/pro-checkout'} style={{ width: '100%', marginTop: 24, padding: '14px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Upgrade for $5/mo</button>
         </div>
       </div>
     </section>

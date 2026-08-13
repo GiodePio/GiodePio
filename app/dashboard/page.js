@@ -158,13 +158,13 @@ function Plans({ freeUses, isPro, trialExhausted }) {
               </div>
             ))}
             {trialExhausted ? (
-              <button disabled className="btn-smooth" style={{ width: '100%', marginTop: 16, padding: '10px 0', background: '#333', color: colors.textDim, border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'not-allowed' }}>
+              <div style={{ width: '100%', marginTop: 16, padding: '10px 0', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, textAlign: 'center' }}>
                 Trial used up
-              </button>
+              </div>
             ) : (
-              <button onClick={() => window.location.href = '/dashboard'} className="btn-smooth" style={{ width: '100%', marginTop: 16, padding: '10px 0', background: colors.blue, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                {freeUses !== null && freeUses !== undefined ? `${freeUses} uses left` : 'Get Started'}
-              </button>
+              <div style={{ width: '100%', marginTop: 16, padding: '10px 0', background: 'rgba(59, 130, 246, 0.08)', color: colors.blue, border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, textAlign: 'center', cursor: 'default' }}>
+                {freeUses !== null && freeUses !== undefined ? `${freeUses} uses remaining` : '3 uses remaining'}
+              </div>
             )}
           </div>
         </div>
@@ -183,7 +183,7 @@ function Plans({ freeUses, isPro, trialExhausted }) {
             {isPro ? (
               <button disabled className="btn-smooth" style={{ width: '100%', marginTop: 16, padding: '10px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, opacity: 0.5, cursor: 'not-allowed' }}>Active</button>
             ) : (
-              <button onClick={() => window.location.href = '/dashboard'} className="btn-smooth" style={{ width: '100%', marginTop: 16, padding: '10px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => window.location.href = 'https://buy.stripe.com/pro-checkout'} className="btn-smooth" style={{ width: '100%', marginTop: 16, padding: '10px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                 Upgrade to Pro
               </button>
             )}
@@ -549,7 +549,7 @@ export default function DashboardPage() {
           <NavItem icon="📊" label="Dashboard" active={page === 'dashboard'} onClick={() => setPage('dashboard')} />
           <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
           <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
-          {!isPro && isOwner && (
+          {isOwner && (
             <NavItem icon="👥" label="Admin" onClick={() => router.push('/admin')} />
           )}
           <NavItem icon="📋" label="Plans" active={page === 'plans'} onClick={() => setPage('plans')} />

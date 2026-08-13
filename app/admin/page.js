@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 const colors = {
@@ -10,8 +10,8 @@ const colors = {
   text: '#f0f0f0',
   textDim: '#6b6e7b',
   green: '#22c55e',
-  red: '#ef4444',
   blue: '#3b82f6',
+  red: '#ef4444',
 };
 
 function NavItem({ icon, label, active, onClick }) {
@@ -30,96 +30,126 @@ function NavItem({ icon, label, active, onClick }) {
   );
 }
 
+const STATUS_COLORS = {
+  online: colors.green,
+  idle: colors.blue,
+  offline: colors.textDim,
+};
+
 export default function AdminPage() {
   const router = useRouter();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [unauthorized, setUnauthorized] = useState(false);
-  const [toggling, setToggling] = useState(null);
+  const [error, setError] = useState(null);
+  const [updating, setUpdating] = useState(null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     fetch('/api/auth/user')
       .then(r => r.json())
       .then(d => {
-        if (!d.user || d.user.email !== 'lifegrading@gmail.com') {
-          setUnauthorized(true);
+        if (d.user?.email !== 'lifegrading@gmail.com') {
+          setError('Unauthorized');
           setLoading(false);
           return;
         }
         fetchUsers();
       })
-      .catch(() => { setUnauthorized(true); setLoading(false); });
+      .catch(() => { setError('Unauthorized'); setLoading(false); });
   }, []);
 
-  const fetchUsers = async () => {
+  useEffect(() => {
+    if (users.length > 0) {
+      const iv = setInterval(() => setTick(t => t + 1), 30000);
+      return () => clearInterval(iv);
+    }
+  }, [users, tick]);
+
+  async function fetchUsers() {
+    setLoading(true);
     try {
       const res = await fetch('/api/admin/users');
       const data = await res.json();
-      setUsers(data.users || []);
-    } catch (e) {}
+      if (res.ok) {
+        setUsers(data.users || []);
+        setError(null);
+      } else {
+        setError(data.error || 'Failed to load users');
+      }
+    } catch (e) {
+      setError('Failed to load users');
+    }
     setLoading(false);
-  };
+  }
 
-  const togglePro = async (email, currentValue) => {
-    setToggling(email);
+  const handleTogglePro = async (email, currentIsPro) => {
+    setUpdating(`${email}_pro`);
     try {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, is_pro: !currentValue }),
+        body: JSON.stringify({ email, is_pro: !currentIsPro }),
       });
       const data = await res.json();
-      if (res.ok && data.ok) {
-        setUsers(prev => prev.map(u => u.email === email ? {
-          ...u,
-          is_pro: !currentValue,
-          free_uses_remaining: !currentValue ? null : (u.free_uses_remaining ?? 3),
-        } : u));
-      } else {
-        console.error('Toggle failed:', data.error);
-        alert('Failed to update: ' + (data.error || 'Unknown error'));
+      if (res.ok) {
+        const updated = users.map(u =>
+          u.email === email ? { ...u, is_pro: !currentIsPro } : u
+        );
+        setUsers(updated);
       }
-    } catch (e) {
-      alert('Network error: ' + e.message);
-    }
-    setToggling(null);
+    } catch (e) { }
+    setUpdating(null);
+  };
+
+  const handleAdjustUses = async (email, action) => {
+    setUpdating(`${email}_${action}`);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, action }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const newUses = data.free_uses_remaining;
+        setUsers(users.map(u =>
+          u.email === email ? { ...u, free_uses_remaining: newUses } : u
+        ));
+      }
+    } catch (e) { }
+    setUpdating(null);
+  };
+
+  const formatTime = (t) => {
+    if (!t) return '—';
+    const d = new Date(t);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   if (loading) {
     return (
-      <div className="page-enter" style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
-            <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
-          </div>
-          <div style={{ flex: 1 }}>
-            <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
-            <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
-            <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
-            <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
-          </div>
-        </aside>
-        <div style={{ flex: 1, padding: '28px 36px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading...</div>
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading...</div>
       </div>
     );
   }
 
-  if (unauthorized) {
+  if (error === 'Unauthorized') {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-          <div style={{ fontSize: 48 }}>🚫</div>
+          <div style={{ fontSize: 48 }}>🔒</div>
           <div style={{ fontSize: 18, fontWeight: 600 }}>Access Denied</div>
-          <div style={{ fontSize: 14, color: colors.textDim }}>Only the admin can access this page.</div>
-          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: colors.blue, fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
+          <div style={{ fontSize: 14, color: colors.textDim }}>Admin privileges required.</div>
         </div>
       </div>
     );
   }
 
+  const isOwner = true;
+
   return (
-    <div className="page-enter" style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
@@ -129,82 +159,103 @@ export default function AdminPage() {
           <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
           <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
           <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
-          <NavItem icon="👥" label="Admin" active onClick={() => router.push('/admin')} />
+          <NavItem icon="👥" label="Admin" active onClick={() => {}} />
+          <NavItem icon="📋" label="Plans" onClick={() => router.push('/dashboard')} />
+          <NavItem icon="⭐" label="+Rep" onClick={() => router.push('/dashboard')} />
           <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
           <NavItem icon="🖥" label="Remote Control" onClick={() => router.push('/dashboard/remote-control')} />
-          <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
         </div>
         <div>
+          <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
           <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
         </div>
       </aside>
 
-      <div style={{ flex: 1, padding: '28px 36px', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+      <main style={{ flex: 1, padding: '28px 36px', overflow: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>Admin Panel</div>
-            <div style={{ fontSize: 13, color: colors.textDim, marginTop: 4 }}>Manage user access and pro licenses</div>
+            <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Admin Panel</h1>
+            <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4 }}>{users.length} users registered</p>
           </div>
-          <div style={{ background: 'rgba(34, 197, 94, 0.15)', color: colors.green, fontSize: 12, padding: '6px 12px', borderRadius: 6, fontWeight: 600 }}>
-            {users.length} users
-          </div>
+          <div onClick={() => fetchUsers()} style={{ cursor: 'pointer', padding: '8px 16px', background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 8, fontSize: 13 }}>↻ Refresh</div>
         </div>
 
-        <div className="glass-card" style={{ borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 100px 100px', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 11, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase' }}>
-            <div>Email</div>
-            <div>Free Uses</div>
-            <div>Joined</div>
-            <div>Last Login</div>
-            <div style={{ textAlign: 'center' }}>Pro</div>
-          </div>
-
-          {users.map((u) => (
-            <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 150px 120px 100px 100px', padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 13, alignItems: 'center' }}>
-              <div>
-                <div style={{ color: colors.text, fontWeight: 500 }}>{u.email}</div>
-                {u.display_name && u.display_name !== u.email && (
-                  <div style={{ color: colors.textDim, fontSize: 12, marginTop: 2 }}>{u.display_name}</div>
-                )}
-              </div>
-              <div style={{ fontSize: 13, color: u.is_pro ? colors.green : (u.free_uses_remaining === 0 ? colors.red : colors.text) }}>
-                {u.is_pro ? 'Unlimited' : (u.free_uses_remaining ?? '—')}
-              </div>
-              <div style={{ color: colors.textDim, fontSize: 12 }}>
-                {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
-              </div>
-              <div style={{ color: colors.textDim, fontSize: 12 }}>
-                {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : 'Never'}
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div
-                  onClick={() => togglePro(u.email, u.is_pro)}
-                  style={{
-                    cursor: toggling === u.email ? 'wait' : 'pointer',
-                    width: 44, height: 24, borderRadius: 12, padding: 2,
-                    background: u.is_pro ? colors.green : '#333',
-                    transition: 'background 0.2s',
-                    opacity: toggling === u.email ? 0.5 : 1,
-                    display: 'inline-block',
-                  }}
-                >
-                  <div style={{
-                    width: 20, height: 20, borderRadius: 10, background: '#fff',
-                    transform: u.is_pro ? 'translateX(20px)' : 'translateX(0)',
-                    transition: 'transform 0.2s',
-                  }} />
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {users.length === 0 && (
-            <div style={{ padding: 40, textAlign: 'center', color: colors.textDim, fontSize: 14 }}>
-              No users found.
-            </div>
+        <div className="glass-card" style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid ' + colors.border }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+                <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Email</th>
+                <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Display Name</th>
+                <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Pro</th>
+                <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Free Uses</th>
+                <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Adjust</th>
+                <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: 12, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border }}>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => {
+                const isPro = u.is_pro;
+                const freeUses = u.free_uses_remaining;
+                const displayFreeUses = isPro ? '∞' : (freeUses !== null && freeUses !== undefined ? String(freeUses) : '—');
+                const canAdjust = !isPro;
+                return (
+                  <tr key={u.id} style={{ borderBottom: '1px solid ' + colors.border }}>
+                    <td style={{ padding: '12px 16px', fontSize: 13, color: colors.text }}>{u.email}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 13, color: colors.text }}>{u.display_name || '—'}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => handleTogglePro(u.email, isPro)}
+                        disabled={updating === `${u.email}_pro`}
+                        style={{
+                          padding: '6px 16px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                          background: isPro ? colors.green : 'rgba(239, 68, 68, 0.15)',
+                          color: isPro ? '#000' : colors.red,
+                          opacity: updating === `${u.email}_pro` ? 0.5 : 1,
+                        }}
+                      >
+                        {updating === `${u.email}_pro` ? '...' : (isPro ? 'Pro' : 'Set Pro')}
+                      </button>
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: 13, color: isPro ? colors.green : colors.text }}>
+                      {displayFreeUses}
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      {canAdjust ? (
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                          <button
+                            onClick={() => handleAdjustUses(u.email, 'remove_use')}
+                            disabled={updating === `${u.email}_remove_use` || !canAdjust}
+                            style={{
+                              width: 32, height: 28, borderRadius: 5, border: '1px solid ' + colors.border,
+                              background: 'rgba(239, 68, 68, 0.1)', color: colors.red, fontSize: 14, cursor: 'pointer',
+                              opacity: updating === `${u.email}_remove_use` ? 0.5 : 1,
+                            }}
+                          >−</button>
+                          <button
+                            onClick={() => handleAdjustUses(u.email, 'add_use')}
+                            disabled={updating === `${u.email}_add_use` || !canAdjust}
+                            style={{
+                              width: 32, height: 28, borderRadius: 5, border: '1px solid ' + colors.border,
+                              background: 'rgba(34, 197, 94, 0.1)', color: colors.green, fontSize: 14, cursor: 'pointer',
+                              opacity: updating === `${u.email}_add_use` ? 0.5 : 1,
+                            }}
+                          >+</button>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 11, color: colors.textDim }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: 13, color: colors.textDim }}>{formatTime(u.created_at)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {users.length === 0 && !loading && (
+            <div style={{ textAlign: 'center', padding: '60px', color: colors.textDim, fontSize: 13 }}>No users found</div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
