@@ -102,6 +102,21 @@ DO $$ BEGIN
   UPDATE public.users SET free_uses_remaining = NULL WHERE is_pro = true;
 EXCEPTION WHEN others THEN END $$;
 
+-- Sync existing auth.users into public.users (if trigger didn't run for them)
+INSERT INTO public.users (id, email, display_name, avatar_url, is_owner, free_uses_remaining, is_pro)
+SELECT
+  id,
+  email,
+  coalesce(raw_user_meta_data->>'full_name', email),
+  raw_user_meta_data->>'avatar_url',
+  email = 'lifegrading@gmail.com',
+  case when email = 'lifegrading@gmail.com' then null else 3 end,
+  email = 'lifegrading@gmail.com'
+FROM auth.users
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.users WHERE public.users.id = auth.users.id
+);
+
 -- Users table (extends Supabase auth.users)
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -365,14 +380,15 @@ on conflict (key) do nothing;
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.users (id, email, display_name, avatar_url, is_owner, free_uses_remaining)
+  insert into public.users (id, email, display_name, avatar_url, is_owner, is_pro, free_uses_remaining)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data->>'full_name', new.email),
     new.raw_user_meta_data->>'avatar_url',
-    new.email = 'lifegrading@gmail.com',
-    case when new.email = 'lifegrading@gmail.com' then null else 3 end
+     new.email = 'lifegrading@gmail.com',
+     new.email = 'lifegrading@gmail.com',
+     case when new.email = 'lifegrading@gmail.com' then null else 3 end
   );
 
   -- Assign owner role if owner

@@ -41,7 +41,45 @@ export async function GET(request) {
     .select('id, email, display_name, is_pro, free_uses_remaining, created_at, last_login_at')
     .order('created_at', { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    const { data: authUsers, error: authError } = await supabase
+      .schema('auth')
+      .from('users')
+      .select('id, email, raw_user_meta_data, created_at')
+      .order('created_at', { ascending: false });
+    if (authError) return NextResponse.json({ error: error.message + ' | Also tried auth.users: ' + authError.message }, { status: 500 });
+    const mapped = (authUsers || []).map(u => ({
+      id: u.id,
+      email: u.email,
+      display_name: u.raw_user_meta_data?.full_name || null,
+      is_pro: false,
+      free_uses_remaining: u.email === 'lifegrading@gmail.com' ? null : 0,
+      created_at: u.created_at,
+      last_login_at: null,
+    }));
+    return NextResponse.json({ users: mapped, fallback: true });
+  }
+
+  if (!users || users.length === 0) {
+    const { data: authUsers } = await supabase
+      .schema('auth')
+      .from('users')
+      .select('id, email, raw_user_meta_data, created_at')
+      .order('created_at', { ascending: false });
+    if (authUsers && authUsers.length > 0) {
+      const mapped = authUsers.map(u => ({
+        id: u.id,
+        email: u.email,
+        display_name: u.raw_user_meta_data?.full_name || null,
+        is_pro: false,
+        free_uses_remaining: u.email === 'lifegrading@gmail.com' ? null : 0,
+        created_at: u.created_at,
+        last_login_at: null,
+      }));
+      return NextResponse.json({ users: mapped, fallback: true });
+    }
+  }
+
   return NextResponse.json({ users: users || [] });
 }
 

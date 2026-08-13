@@ -42,7 +42,6 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState(null);
-  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     fetch('/api/auth/user')
@@ -55,29 +54,22 @@ export default function AdminPage() {
         }
         fetchUsers();
       })
-      .catch(() => { setError('Unauthorized'); setLoading(false); });
+      .catch(() => { setError('Auth check failed'); setLoading(false); });
   }, []);
-
-  useEffect(() => {
-    if (users.length > 0) {
-      const iv = setInterval(() => setTick(t => t + 1), 30000);
-      return () => clearInterval(iv);
-    }
-  }, [users, tick]);
 
   async function fetchUsers() {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/admin/users');
       const data = await res.json();
       if (res.ok) {
         setUsers(data.users || []);
-        setError(null);
       } else {
-        setError(data.error || 'Failed to load users');
+        setError(data.error || 'Failed to load users (HTTP ' + res.status + ')');
       }
     } catch (e) {
-      setError('Failed to load users');
+      setError('Network error: ' + (e.message || 'Failed to load users'));
     }
     setLoading(false);
   }
@@ -134,7 +126,7 @@ export default function AdminPage() {
     );
   }
 
-  if (error === 'Unauthorized') {
+  if (error === 'Unauthorized' || error === 'Auth check failed') {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
@@ -146,7 +138,22 @@ export default function AdminPage() {
     );
   }
 
-  const isOwner = true;
+  if (error) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ flex: 1, padding: '28px 36px' }}>
+          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: 12, padding: '24px', color: colors.text, marginBottom: 24 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: colors.red }}>⚠ Database Error</div>
+            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 16, whiteSpace: 'pre-wrap' }}>{error}</div>
+            <button onClick={() => fetchUsers()} style={{ cursor: 'pointer', padding: '8px 20px', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600 }}>Retry</button>
+          </div>
+          <div style={{ fontSize: 13, color: colors.textDim }}>
+            If this persists, run the schema in Supabase SQL Editor: `lib/supabase/schema.sql`
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
