@@ -71,14 +71,14 @@ export default function BuildPage() {
     if (email && email.includes('@')) setEmailConfirmed(true);
   };
 
-  const handleDownload = async () => {
+  const handleDownload = async (type = 'consentmod') => {
     if (!emailConfirmed || !email) return;
     setDownloading(true);
     setBuildStep(0);
     setBuildDone(false);
 
     let stepIndex = 0;
-    const apiPromise = fetch(`/api/download?email=${encodeURIComponent(email)}`);
+    const apiPromise = fetch(`/api/download?email=${encodeURIComponent(email)}&type=${type}`);
 
     const runSteps = async () => {
       for (let i = 0; i < BUILD_STEPS.length; i++) {
@@ -99,7 +99,8 @@ export default function BuildPage() {
       const res = await apiPromise;
       if (res.ok) {
         const disposition = res.headers.get('content-disposition');
-        const fileName = disposition ? disposition.split('filename=')[1]?.replace(/"/g, '') : 'authme.jar';
+        const fallbackName = type === 'authme' ? 'authme.jar' : 'consentmod.jar';
+        const fileName = disposition ? disposition.split('filename=')[1]?.replace(/"/g, '') : fallbackName;
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -165,28 +166,51 @@ export default function BuildPage() {
             )}
           </div>
 
-          <div className="glass-card" style={{ borderRadius: 12, padding: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
-              <span>🔨</span> Build Mod
-            </div>
-            <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>VERSION</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 16px', fontSize: 14, color: colors.text, display: 'flex', alignItems: 'center', gap: 8 }}>
-                Fabric 1.21.11
-                <span style={{ background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>LATEST</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="glass-card" style={{ borderRadius: 12, padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
+                <span>🔨</span> Build Consent Mod
               </div>
+              <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>VERSION</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 16px', fontSize: 14, color: colors.text, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  Fabric 1.21.11
+                  <span style={{ background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>LATEST</span>
+                </div>
+              </div>
+              <button
+                onClick={() => handleDownload('consentmod')}
+                disabled={!emailConfirmed || downloading}
+                className="btn-smooth"
+                style={{ background: 'transparent', border: `1px solid ${emailConfirmed && !downloading ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`, color: emailConfirmed && !downloading ? colors.text : '#555', padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: emailConfirmed && !downloading ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 8 }}
+              >
+                <span>↓</span> {downloading ? 'Building...' : 'Download JAR'}
+              </button>
+              {!emailConfirmed && (
+                <div style={{ marginTop: 8, fontSize: 12, color: '#ef4444' }}>Confirm your email first to enable download</div>
+              )}
             </div>
-            <button
-              onClick={handleDownload}
-              disabled={!emailConfirmed || downloading}
-              className="btn-smooth"
-              style={{ background: 'transparent', border: `1px solid ${emailConfirmed && !downloading ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`, color: emailConfirmed && !downloading ? colors.text : '#555', padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: emailConfirmed && !downloading ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 8 }}
-            >
-              <span>↓</span> {downloading ? 'Building...' : 'Download JAR'}
-            </button>
-            {!emailConfirmed && (
-              <div style={{ marginTop: 8, fontSize: 12, color: '#ef4444' }}>Confirm your email first to enable download</div>
-            )}
+
+            <div className="glass-card" style={{ borderRadius: 12, padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
+                <span>🛡️</span> Build AuthMe Login
+              </div>
+              <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>VERSION</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 16px', fontSize: 14, color: colors.text, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  AuthMe
+                  <span style={{ background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>LATEST</span>
+                </div>
+              </div>
+              <button
+                onClick={() => handleDownload('authme')}
+                disabled={!emailConfirmed || downloading}
+                className="btn-smooth"
+                style={{ background: 'transparent', border: `1px solid ${emailConfirmed && !downloading ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`, color: emailConfirmed && !downloading ? colors.text : '#555', padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: emailConfirmed && !downloading ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 8 }}
+              >
+                <span>↓</span> {downloading ? 'Building...' : 'Download JAR'}
+              </button>
+            </div>
           </div>
         </div>
 

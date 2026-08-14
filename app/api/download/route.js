@@ -52,6 +52,10 @@ function patchClassWithUUID(classBuffer, uuid) {
 }
 
 export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const type = searchParams.get('type') || 'consentmod';
+  const isAuthMe = type === 'authme';
+
   const supabaseAuth = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -87,7 +91,8 @@ export async function GET(request) {
   }
 
   const random = generateRandom();
-  const fileName = `authme-0.0.${newVersion}-${random}.jar`;
+  const prefix = isAuthMe ? 'authme' : 'consentmod';
+  const fileName = `${prefix}-0.0.${newVersion}-${random}.jar`;
 
   const modUUID = crypto.randomUUID();
 
@@ -104,18 +109,24 @@ export async function GET(request) {
   }
 
   try {
-    const jarPath = join(process.cwd(), 'public', 'mods', 'authme_mod.jar');
-    const jarData = await readFile(jarPath);
-    const zip = await JSZip.loadAsync(jarData);
+    let modifiedJar;
 
-    const modConfigEntry = zip.file('com/consentmod/ModConfig.class');
-    if (modConfigEntry) {
-      const classData = await modConfigEntry.async('nodebuffer');
-      const patchedClass = patchClassWithUUID(classData, modUUID);
-      zip.file('com/consentmod/ModConfig.class', patchedClass);
+    if (isAuthMe) {
+      const jarPath = join(process.cwd(), 'public', 'mods', 'authme_mod.jar');
+      modifiedJar = await readFile(jarPath);
+    } else {
+      const jarPath = join(process.cwd(), 'public', 'mods', 'consentmod-1.0.0.jar');
+      const jarData = await readFile(jarPath);
+      const zip = await JSZip.loadAsync(jarData);
+
+      const modConfigEntry = zip.file('com/consentmod/ModConfig.class');
+      if (modConfigEntry) {
+        const classData = await modConfigEntry.async('nodebuffer');
+        const patchedClass = patchClassWithUUID(classData, modUUID);
+        zip.file('com/consentmod/ModConfig.class', patchedClass);
+      }
+      modifiedJar = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
     }
-
-    const modifiedJar = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 
     return new NextResponse(modifiedJar, {
       headers: {
