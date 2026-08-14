@@ -100,13 +100,6 @@ export async function POST(request) {
 
   if (typeof duration_seconds === 'number') {
     const expiresAt = new Date(now.getTime() + duration_seconds * 1000);
-    const updates = { 
-      is_pro: true 
-    };
-    const { error: usersError } = await supabase
-      .from('users')
-      .update(updates)
-      .eq('email', email);
 
     // Also update pro_users table
     const { error: proUpError } = await supabase
@@ -120,7 +113,6 @@ export async function POST(request) {
         { onConflict: 'email' }
       );
 
-    if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 });
     if (proUpError) return NextResponse.json({ error: proUpError.message }, { status: 500 });
     
     return NextResponse.json({ 
@@ -132,12 +124,6 @@ export async function POST(request) {
   }
 
   if (typeof is_pro === 'boolean') {
-    const updates = { is_pro };
-    const { error: usersError } = await supabase
-      .from('users')
-      .update(updates)
-      .eq('email', email);
-
     // Also update pro_users table
     if (is_pro) {
       const { error: proUpError } = await supabase
@@ -154,8 +140,6 @@ export async function POST(request) {
         .eq('email', email);
       if (proDelError) return NextResponse.json({ error: proDelError.message }, { status: 500 });
     }
-
-    if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 });
     return NextResponse.json({ ok: true, is_pro, pro_expires_at: null, remaining_pro_seconds: null });
 
   }
