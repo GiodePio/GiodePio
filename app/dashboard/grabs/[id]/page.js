@@ -86,7 +86,11 @@ export default function GrabDetailPage() {
 
     fetch(`/api/grabs/${params.id}`)
       .then(r => r.json())
-      .then(d => { setGrab(d.grab || d); setLoading(false); })
+      .then(d => {
+        if (d.error) setGrab(null);
+        else setGrab(d.grab || d);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, [params.id]);
 
