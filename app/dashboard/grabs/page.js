@@ -46,8 +46,6 @@ export default function GrabsPage() {
   const [proChecked, setProChecked] = useState(false);
   const [, setTick] = useState(0);
 
-  const isOwner = userEmail === 'lifegrading@gmail.com';
-
 
   useEffect(() => {
     const interval = setInterval(() => setTick(t => t + 1), 10000);
