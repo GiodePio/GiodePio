@@ -247,8 +247,8 @@ function Plans({ freeUses, isPro, trialExhausted }) {
           <div className="glass-card" style={{ border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: 12, padding: 28, position: 'relative' }}>
             <div style={{ position: 'absolute', top: -10, left: 20, background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 8 }}>PRO</div>
             <div style={{ fontSize: 12, color: colors.green, letterSpacing: 1, marginBottom: 6, fontWeight: 600 }}>👑 ULTIMATE GRABS</div>
-            <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$9.99</div>
-            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 4 }}> <s style={{ color: colors.red, fontSize: 22 }}>9.99</s> <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: colors.red, fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600, marginLeft: 4 }}>SALE: 4.99</span></div>
+            <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$4.99</div>
+            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 4 }}> <s style={{ color: colors.red, fontSize: 22 }}>9.99</s> <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: colors.red, fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600, marginLeft: 4 }}>50% off coupon New</span></div>
             {['Unlimited sessions', 'Permanent data retention', 'Webhook notifications', 'Auth Mods & Builds', 'Remote control access', 'Priority support'].map((f, i) => (
               <div key={i} style={{ fontSize: 13, color: colors.text, marginBottom: 8, display: 'flex', gap: 8 }}>
                 <span style={{ color: colors.green }}>✓</span> {f}
