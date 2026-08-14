@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Sidebar from '@/components/Sidebar';
 
 const colors = {
   bg: '#050508',
@@ -14,21 +15,6 @@ const colors = {
   red: '#ef4444',
 };
 
-function NavItem({ icon, label, active, onClick }) {
-  return (
-    <div onClick={onClick} className="btn-smooth" style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
-      background: active ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
-      color: active ? colors.green : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
-    }}
-    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = colors.text; } }}
-    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = colors.textDim; } }}
-    >
-      <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{icon}</span>
-      <span>{label}</span>
-    </div>
-  );
-}
 
 function Dashboard({ userEmail, freeUses, isPro, trialExhausted }) {
   const [grabCount, setGrabCount] = useState(0);
@@ -544,24 +530,45 @@ function LiveCaptures() {
   );
 }
 
+function DashboardContent({ userEmail, freeUses, isPro, trialExhausted }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get('tab') || 'dashboard';
+  const [page, setPage] = useState(tab);
+
+  useEffect(() => {
+    setPage(tab);
+  }, [tab]);
+
+  const isOwner = userEmail === 'lifegrading@gmail.com';
+  const canAccess = isPro || isOwner || freeUses > 0;
+
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+      <Sidebar userEmail={userEmail} />
+      {page === 'dashboard' && <Dashboard userEmail={userEmail} freeUses={freeUses} isPro={isPro} trialExhausted={trialExhausted} />}
+      {page === 'plans' && <Plans freeUses={freeUses} isPro={isPro} trialExhausted={trialExhausted} />}
+      {page === 'live' && <LiveCaptures />}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
-  const [page, setPage] = useState('dashboard');
-  const [user, setUser] = useState(null);
+  const [userEmail, setUserEmail] = useState('');
   const [isPro, setIsPro] = useState(false);
   const [freeUses, setFreeUses] = useState(null);
   const [trialExhausted, setTrialExhausted] = useState(false);
-  const [proChecked, setProChecked] = useState(false);
-  const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/user')
       .then(r => r.json())
       .then(d => {
-        if (d.user) {
-          setUser(d.user);
+        if (d.user?.email) {
+          setUserEmail(d.user.email);
           if (d.user.email.toLowerCase() === 'lifegrading@gmail.com') {
             setIsPro(true);
-            setProChecked(true);
+            setAuthChecked(true);
           } else {
             fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' })
               .then(r => r.json())
@@ -569,69 +576,28 @@ export default function DashboardPage() {
                 setIsPro(p.is_pro);
                 setFreeUses(p.free_uses_remaining);
                 setTrialExhausted(p.trial_exhausted || false);
-                setProChecked(true);
+                setAuthChecked(true);
               })
-              .catch(() => { setIsPro(false); setProChecked(true); });
+              .catch(() => setAuthChecked(true));
           }
         } else {
-          setProChecked(true);
+          window.location.href = '/login';
         }
       })
-      .catch(() => setProChecked(true));
+      .catch(() => setAuthChecked(true));
   }, []);
 
-  const username = user?.name || 'You';
-  const userEmail = user?.email || '';
-  const isOwner = userEmail === 'lifegrading@gmail.com';
-
-  if (!proChecked) {
+  if (!authChecked) {
     return (
-      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading...</div>
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: colors.textDim }}>Loading...</div>
       </div>
     );
   }
 
-  const canAccess = isPro || isOwner || freeUses > 0;
-
-
-
-  const NavSection = ({title}) => <div style={{fontSize:10,color:colors.textDim,letterSpacing:2,textTransform:'uppercase',padding:'16px 14px 6px',fontWeight:600}}>{title}</div>;
-
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
-          <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
-        </div>
-        <div style={{ flex: 1 }}>
-          <NavSection title="OVERVIEW"/>
-          <NavItem icon="📊" label="Dashboard" active={page === 'dashboard'} onClick={() => setPage('dashboard')} />
-          <NavItem icon="📋" label="Plans" active={page === 'plans'} onClick={() => setPage('plans')} />
-          <NavSection title="MANAGEMENT"/>
-          <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
-          <NavItem icon="📡" label="Live Captures" active={page === 'live'} onClick={() => setPage('live')} />
-          <NavItem icon="🖥" label="Remote Control" onClick={() => router.push('/dashboard/remote-control')} />
-          <NavSection title="UTILITIES"/>
-          <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
-          <NavSection title="COMMUNITY & ACCESS"/>
-          <NavItem icon="⭐" label="+Rep" onClick={() => router.push('/dashboard/rep')} />
-          <NavItem icon="📢" label="Updates" onClick={() => router.push('/dashboard/updates')} />
-          <NavItem icon="🏆" label="Leaderboard" onClick={() => router.push('/dashboard/leaderboard')} />
-          <NavSection title="SYSTEM & SUPPORT"/>
-          <NavItem icon="💬" label="Join Discord" onClick={() => window.open('https://discord.gg/FV2668v4Zp','_blank')} />
-          <NavItem icon="🎫" label="Tickets" onClick={() => router.push('/dashboard/tickets')} />
-          {isOwner && <NavItem icon="👥" label="Admin" onClick={() => router.push('/admin')} />}
-        </div>
-        <div>
-          <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
-          <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
-        </div>
-      </aside>
-      {page === 'dashboard' && <Dashboard userEmail={userEmail} freeUses={freeUses} isPro={isPro} trialExhausted={trialExhausted} />}
-      {page === 'plans' && <Plans freeUses={freeUses} isPro={isPro} trialExhausted={trialExhausted} />}
-      {page === 'live' && <LiveCaptures />}
-    </div>
+    <Suspense fallback={<div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, alignItems: 'center', justifyContent: 'center' }}>Loading...</div>}>
+      <DashboardContent userEmail={userEmail} freeUses={freeUses} isPro={isPro} trialExhausted={trialExhausted} />
+    </Suspense>
   );
 }

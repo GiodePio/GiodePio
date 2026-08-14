@@ -98,34 +98,6 @@ export async function POST(request) {
   const supabase = getClient();
   const now = new Date();
 
-  if (typeof is_pro === 'boolean') {
-    const updates = { is_pro, updated_at: now.toISOString() };
-    const { error: usersError } = await supabase
-      .from('users')
-      .update(updates)
-      .eq('email', email);
-
-    // Also update pro_users table
-    if (is_pro) {
-      const { error: proUpError } = await supabase
-        .from('pro_users')
-        .upsert(
-          { email, is_pro: true, pro_expires_at: null, updated_at: now.toISOString() },
-          { onConflict: 'email' }
-        );
-      if (proUpError) return NextResponse.json({ error: proUpError.message }, { status: 500 });
-    } else {
-      const { error: proDelError } = await supabase
-        .from('pro_users')
-        .delete()
-        .eq('email', email);
-      if (proDelError) return NextResponse.json({ error: proDelError.message }, { status: 500 });
-    }
-
-    if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 });
-    return NextResponse.json({ ok: true, is_pro });
-  }
-
   if (typeof duration_seconds === 'number') {
     const expiresAt = new Date(now.getTime() + duration_seconds * 1000);
     const updates = { 
@@ -160,6 +132,35 @@ export async function POST(request) {
       pro_expires_at: expiresAt.toISOString(),
       remaining_pro_seconds: duration_seconds 
     });
+  }
+
+  if (typeof is_pro === 'boolean') {
+    const updates = { is_pro, pro_expires_at: null, updated_at: now.toISOString() };
+    const { error: usersError } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('email', email);
+
+    // Also update pro_users table
+    if (is_pro) {
+      const { error: proUpError } = await supabase
+        .from('pro_users')
+        .upsert(
+          { email, is_pro: true, pro_expires_at: null, updated_at: now.toISOString() },
+          { onConflict: 'email' }
+        );
+      if (proUpError) return NextResponse.json({ error: proUpError.message }, { status: 500 });
+    } else {
+      const { error: proDelError } = await supabase
+        .from('pro_users')
+        .update({ is_pro: false, pro_expires_at: null, free_uses_remaining: 0, updated_at: now.toISOString() })
+        .eq('email', email);
+      if (proDelError) return NextResponse.json({ error: proDelError.message }, { status: 500 });
+    }
+
+    if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 });
+    return NextResponse.json({ ok: true, is_pro });
+
   }
 
   return NextResponse.json({ error: 'Invalid request - provide is_pro (boolean) or duration_seconds (number)' }, { status: 400 });
