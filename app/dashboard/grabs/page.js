@@ -15,7 +15,21 @@ const colors = {
   red: '#ef4444',
 };
 
-
+function NavItem({ icon, label, active, onClick }) {
+  return (
+    <div onClick={onClick} className="btn-smooth" style={{
+      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
+      background: active ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
+      color: active ? colors.green : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
+    }}
+    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = colors.text; } }}
+    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = colors.textDim; } }}
+    >
+      <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{icon}</span>
+      <span>{label}</span>
+    </div>
+  );
+}
 
 export default function GrabsPage() {
   const router = useRouter();

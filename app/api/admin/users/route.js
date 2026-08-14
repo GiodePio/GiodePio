@@ -141,7 +141,7 @@ export async function POST(request) {
       const { error: proUpError } = await supabase
         .from('pro_users')
         .upsert(
-          { email, is_pro: true },
+          { email, is_pro: true, pro_expires_at: null },
           { onConflict: 'email' }
         );
       if (proUpError) {
