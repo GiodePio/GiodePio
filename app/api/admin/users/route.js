@@ -137,19 +137,29 @@ export async function POST(request) {
   if (typeof is_pro === 'boolean') {
     // Also update pro_users table
     if (is_pro) {
+      console.log(`[DEBUG] Attempting to upsert permanent pro for ${email}`);
       const { error: proUpError } = await supabase
         .from('pro_users')
         .upsert(
           { email, is_pro: true },
           { onConflict: 'email' }
         );
-      if (proUpError) return NextResponse.json({ error: proUpError.message }, { status: 500 });
+      if (proUpError) {
+        console.error(`[DEBUG] Upsert failed for ${email}:`, proUpError);
+        return NextResponse.json({ error: proUpError.message, details: proUpError }, { status: 500 });
+      }
+      console.log(`[DEBUG] Successfully upserted permanent pro for ${email}`);
     } else {
+      console.log(`[DEBUG] Attempting to revoke pro for ${email}`);
       const { error: proDelError } = await supabase
         .from('pro_users')
         .delete()
         .ilike('email', email);
-      if (proDelError) return NextResponse.json({ error: proDelError.message }, { status: 500 });
+      if (proDelError) {
+        console.error(`[DEBUG] Delete failed for ${email}:`, proDelError);
+        return NextResponse.json({ error: proDelError.message, details: proDelError }, { status: 500 });
+      }
+      console.log(`[DEBUG] Successfully revoked pro for ${email}`);
     }
     return NextResponse.json({ ok: true, is_pro, pro_expires_at: null, remaining_pro_seconds: null });
 

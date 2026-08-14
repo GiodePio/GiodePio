@@ -796,7 +796,9 @@ export default function AdminPage() {
       if (res.ok) {
         setUsers(prev => prev.map(u => u.email.toLowerCase() === email.toLowerCase() ? { ...u, is_pro: true, pro_expires_at: data.pro_expires_at, remaining_pro_seconds: data.remaining_pro_seconds, free_uses_remaining: null } : u));
       } else {
-        setError(`Failed to grant Pro for ${email}: ${data.error || res.statusText}`);
+        const errorMsg = `Failed to grant Pro for ${email}: ${data.error || res.statusText}`;
+        setError(errorMsg);
+        alert(errorMsg);
       }
     } catch (e) {
       setError(`Network error: ${e.message}`);
