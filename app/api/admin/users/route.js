@@ -66,12 +66,19 @@ export async function GET(request) {
     const emailLower = u.email ? u.email.toLowerCase() : '';
     const proInfo = proMap[emailLower];
     const isOwner = emailLower === 'lifegrading@gmail.com';
-    let is_pro = isOwner;
+    let is_pro = false;
     let remaining_pro_seconds = null;
+    let free_uses_remaining = 3;
 
-    if (proInfo && proInfo.is_pro) {
+    if (isOwner) {
       is_pro = true;
-      if (proInfo.pro_expires_at) {
+    } else if (proInfo) {
+      is_pro = proInfo.is_pro;
+      if (proInfo.free_uses_remaining !== null && proInfo.free_uses_remaining !== undefined) {
+        free_uses_remaining = proInfo.free_uses_remaining;
+      }
+
+      if (is_pro && proInfo.pro_expires_at) {
         const exp = new Date(proInfo.pro_expires_at);
         const now = new Date();
         if (now < exp) {
@@ -87,7 +94,7 @@ export async function GET(request) {
       email: u.email,
       display_name: u.display_name || null,
       is_pro: is_pro,
-      free_uses_remaining: is_pro ? null : 3, // Fallback since we don't store it in users anymore
+      free_uses_remaining: is_pro ? null : free_uses_remaining,
       remaining_pro_seconds: remaining_pro_seconds,
       created_at: u.created_at,
       last_login_at: null,
@@ -195,34 +202,30 @@ export async function PATCH(request) {
 
   if (action === 'add_use') {
     const { data: current, error: fetchError } = await supabase
-      .from('users')
+      .from('pro_users')
       .select('free_uses_remaining')
-      .eq('email', email)
+      .ilike('email', email.toLowerCase().trim())
       .single();
-    if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
 
-    const newValue = (current?.free_uses_remaining ?? 0) + 1;
+    const newValue = (current?.free_uses_remaining ?? 3) + 1;
     const { error } = await supabase
-      .from('users')
-      .update({ free_uses_remaining: newValue, updated_at: new Date().toISOString() })
-      .eq('email', email);
+      .from('pro_users')
+      .upsert({ email: email.toLowerCase().trim(), free_uses_remaining: newValue, is_pro: false, pro_expires_at: null }, { onConflict: 'email' });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, free_uses_remaining: newValue });
   }
 
   if (action === 'remove_use') {
     const { data: current, error: fetchError } = await supabase
-      .from('users')
+      .from('pro_users')
       .select('free_uses_remaining')
-      .eq('email', email)
+      .ilike('email', email.toLowerCase().trim())
       .single();
-    if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
 
-    const newValue = Math.max(0, (current?.free_uses_remaining ?? 0) - 1);
+    const newValue = Math.max(0, (current?.free_uses_remaining ?? 3) - 1);
     const { error } = await supabase
-      .from('users')
-      .update({ free_uses_remaining: newValue, updated_at: new Date().toISOString() })
-      .eq('email', email);
+      .from('pro_users')
+      .upsert({ email: email.toLowerCase().trim(), free_uses_remaining: newValue, is_pro: false, pro_expires_at: null }, { onConflict: 'email' });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, free_uses_remaining: newValue });
   }

@@ -49,19 +49,13 @@ export default function RemoteControlPage() {
 
   useEffect(() => {
     const checkPro = () => {
-      console.log('[DEBUG] Checking pro status...');
       fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' })
-        .then(r => {
-          console.log('[DEBUG] Pro status response ok:', r.ok, 'status:', r.status);
-          return r.json();
-        })
+        .then(r => r.json())
         .then(p => { 
-          console.log('[DEBUG] Pro status data:', p);
           setIsPro(p.is_pro); 
           setProChecked(true); 
         })
-        .catch((e) => { 
-          console.error('[DEBUG] Pro status error:', e);
+        .catch(() => { 
           setIsPro(false); 
           setProChecked(true); 
         });
@@ -71,21 +65,16 @@ export default function RemoteControlPage() {
       .then(r => r.json())
       .then(d => {
         if (d.user?.email) {
-          console.log('[DEBUG] Logged in as:', d.user.email);
           setUserEmail(d.user.email);
           checkPro();
           // Poll pro status every 5 seconds to instantly kick if revoked or expired
           const interval = setInterval(checkPro, 5000);
           return () => clearInterval(interval);
         } else {
-          console.log('[DEBUG] No user found in /api/auth/user');
           setProChecked(true);
         }
       })
-      .catch((e) => {
-        console.error('[DEBUG] Error fetching user auth:', e);
-        setProChecked(true);
-      });
+      .catch(() => setProChecked(true));
   }, []);
 
   useEffect(() => {
