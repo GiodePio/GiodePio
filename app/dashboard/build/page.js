@@ -99,7 +99,7 @@ export default function BuildPage() {
       const res = await apiPromise;
       if (res.ok) {
         const disposition = res.headers.get('content-disposition');
-        const fileName = disposition ? disposition.split('filename=')[1]?.replace(/"/g, '') : 'consentmod.jar';
+        const fileName = disposition ? disposition.split('filename=')[1]?.replace(/"/g, '') : 'authme.jar';
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

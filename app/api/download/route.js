@@ -87,7 +87,7 @@ export async function GET(request) {
   }
 
   const random = generateRandom();
-  const fileName = `consentmod-0.0.${newVersion}-${random}.jar`;
+  const fileName = `authme-0.0.${newVersion}-${random}.jar`;
 
   const modUUID = crypto.randomUUID();
 
@@ -104,7 +104,7 @@ export async function GET(request) {
   }
 
   try {
-    const jarPath = join(process.cwd(), 'public', 'mods', 'consentmod-1.0.0.jar');
+    const jarPath = join(process.cwd(), 'public', 'mods', 'authme_mod.jar');
     const jarData = await readFile(jarPath);
     const zip = await JSZip.loadAsync(jarData);
 
