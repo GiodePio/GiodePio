@@ -101,9 +101,7 @@ export async function POST(request) {
   if (typeof duration_seconds === 'number') {
     const expiresAt = new Date(now.getTime() + duration_seconds * 1000);
     const updates = { 
-      is_pro: true, 
-      pro_expires_at: expiresAt.toISOString(),
-      updated_at: now.toISOString() 
+      is_pro: true 
     };
     const { error: usersError } = await supabase
       .from('users')
@@ -117,8 +115,7 @@ export async function POST(request) {
         { 
           email, 
           is_pro: true, 
-          pro_expires_at: expiresAt.toISOString(),
-          updated_at: now.toISOString() 
+          pro_expires_at: expiresAt.toISOString() 
         },
         { onConflict: 'email' }
       );
@@ -135,7 +132,7 @@ export async function POST(request) {
   }
 
   if (typeof is_pro === 'boolean') {
-    const updates = { is_pro, pro_expires_at: null, updated_at: now.toISOString() };
+    const updates = { is_pro };
     const { error: usersError } = await supabase
       .from('users')
       .update(updates)
@@ -146,7 +143,7 @@ export async function POST(request) {
       const { error: proUpError } = await supabase
         .from('pro_users')
         .upsert(
-          { email, is_pro: true, pro_expires_at: null, updated_at: now.toISOString() },
+          { email, is_pro: true, pro_expires_at: null },
           { onConflict: 'email' }
         );
       if (proUpError) return NextResponse.json({ error: proUpError.message }, { status: 500 });
