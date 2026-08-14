@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
-import { getUserProState } from '@/lib/supabase/free-trial';
 
 function getClient() {
   return createClient(
@@ -28,140 +27,116 @@ function getClientAuth(request) {
   );
 }
 
-const ADMIN_EMAIL = 'lifegrading@gmail.com';
-
-function isOwnerEmail(email) {
-  return email && email.toLowerCase().trim() === ADMIN_EMAIL;
-}
-
 export async function GET(request) {
   const supabaseAuth = getClientAuth(request);
   const { data: { user } } = await supabaseAuth.auth.getUser();
-  if (!user || !isOwnerEmail(user.email)) {
+  if (!user || user.email !== 'lifegrading@gmail.com') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const supabase = getClient();
 
-  let authUsersList = [];
-  try {
-    const { data: authData } = await supabase.auth.admin.listUsers();
-    if (authData?.users) authUsersList = authData.users;
-  } catch (e) {}
+  const { data: users, error } = await supabase
+    .from('users')
+    .select('id, email, display_name, is_pro, free_uses_remaining, created_at, last_login_at')
+    .order('created_at', { ascending: false });
 
-  const userMap = new Map();
-
-  for (const au of authUsersList) {
-    if (!au.email) continue;
-    const normEmail = au.email.toLowerCase().trim();
-    const meta = au.user_metadata || {};
-    const state = await getUserProState(supabase, normEmail);
-
-    userMap.set(normEmail, {
-      id: au.id,
-      email: au.email,
-      display_name: meta.full_name || au.email,
-      is_pro: state.is_pro,
-      pro_expires_at: state.pro_expires_at || null,
-      remaining_pro_seconds: state.remaining_seconds,
-      free_uses_remaining: state.free_uses_remaining,
-      created_at: au.created_at,
-      last_login_at: au.last_sign_in_at || null,
-    });
+  if (error) {
+    const { data: usersBasic, error: errorBasic } = await supabase
+      .from('users')
+      .select('id, email, display_name, created_at')
+      .order('created_at', { ascending: false });
+    if (errorBasic) {
+      return NextResponse.json({ error: error.message, details: errorBasic.message }, { status: 500 });
+    }
+    const mapped = (usersBasic || []).map(u => ({
+      id: u.id,
+      email: u.email,
+      display_name: u.display_name || null,
+      is_pro: u.email === 'lifegrading@gmail.com',
+      free_uses_remaining: u.email === 'lifegrading@gmail.com' ? null : 3,
+      created_at: u.created_at,
+      last_login_at: null,
+    }));
+    return NextResponse.json({ users: mapped, columns_missing: true, error: 'Database columns missing - run schema.sql' });
   }
 
-  const result = Array.from(userMap.values());
-  return NextResponse.json({ users: result });
+  if (!users || users.length === 0) {
+    const { data: authUsers, error: authError } = await supabase
+      .from('users')
+      .select('id, email, created_at');
+    if (authError) return NextResponse.json({ users: [] });
+    const mapped = (authUsers || []).map(u => ({
+      id: u.id,
+      email: u.email,
+      display_name: null,
+      is_pro: u.email === 'lifegrading@gmail.com',
+      free_uses_remaining: u.email === 'lifegrading@gmail.com' ? null : 3,
+      created_at: u.created_at,
+      last_login_at: null,
+    }));
+    return NextResponse.json({ users: mapped, fallback: true });
+  }
+
+  return NextResponse.json({ users: users || [] });
 }
 
 export async function POST(request) {
   const supabaseAuth = getClientAuth(request);
   const { data: { user } } = await supabaseAuth.auth.getUser();
-  if (!user || !isOwnerEmail(user.email)) {
+  if (!user || user.email !== 'lifegrading@gmail.com') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const body = await request.json();
   const { email, is_pro, duration_seconds } = body;
 
-  if (!email || typeof is_pro !== 'boolean') {
-    return NextResponse.json({ error: 'email and is_pro required' }, { status: 400 });
+  if (!email) {
+    return NextResponse.json({ error: 'email required' }, { status: 400 });
   }
 
-  const normEmail = email.toLowerCase().trim();
   const supabase = getClient();
-  const freeUses = is_pro ? null : 3;
 
-  let proExpiresAt = null;
-  if (is_pro && typeof duration_seconds === 'number' && duration_seconds > 0) {
-    proExpiresAt = new Date(Date.now() + duration_seconds * 1000).toISOString();
-  }
-
-  // Write to public.pro_users table
-  let proErr = null;
-  try {
+  if (typeof is_pro === 'boolean') {
+    const updates = { is_pro, updated_at: new Date().toISOString() };
     const { error } = await supabase
-      .from('pro_users')
-      .upsert({
-        email: normEmail,
-        is_pro,
-        pro_expires_at: proExpiresAt,
-        free_uses_remaining: freeUses,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'email' });
-    if (error) proErr = error.message;
-  } catch (e) {
-    proErr = e.message;
-  }
-
-  if (proErr) {
-    return NextResponse.json({ error: `Supabase error (pro_users table missing or column missing?): ${proErr}` }, { status: 500 });
-  }
-
-  // Write to public.users as well just to keep tables in sync (ignore missing timer column)
-  try {
-    const { data: updatedRows, error: updateErr } = await supabase
       .from('users')
-      .update({
-        is_pro,
-        free_uses_remaining: freeUses,
-        updated_at: new Date().toISOString(),
-      })
-      .ilike('email', normEmail)
-      .select();
+      .update(updates)
+      .eq('email', email);
 
-    if (updateErr || !updatedRows || updatedRows.length === 0) {
-      let targetAuthId = null;
-      const { data: authData } = await supabase.auth.admin.listUsers();
-      const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
-      if (targetAuth) targetAuthId = targetAuth.id;
+    if (error) return NextResponse.json({ error: error.message, details: error.hint }, { status: 500 });
+    return NextResponse.json({ ok: true, is_pro });
+  }
 
-      await supabase.from('users').upsert({
-        id: targetAuthId,
-        email: normEmail,
-        is_pro,
-        free_uses_remaining: freeUses,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'email' });
-    }
-  } catch (e) {}
+  if (typeof duration_seconds === 'number') {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + duration_seconds * 1000);
+    const updates = { 
+      is_pro: true, 
+      pro_expires_at: expiresAt.toISOString(),
+      updated_at: now.toISOString() 
+    };
+    const { error } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('email', email);
 
-  const remainingProSeconds = proExpiresAt ? Math.max(0, Math.floor((new Date(proExpiresAt) - new Date()) / 1000)) : null;
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ 
+      ok: true, 
+      is_pro: true, 
+      pro_expires_at: expiresAt.toISOString(),
+      remaining_pro_seconds: duration_seconds 
+    });
+  }
 
-  return NextResponse.json({
-    ok: true,
-    email: normEmail,
-    is_pro,
-    pro_expires_at: proExpiresAt,
-    remaining_pro_seconds: remainingProSeconds,
-    free_uses_remaining: freeUses,
-  });
+  return NextResponse.json({ error: 'Invalid request - provide is_pro (boolean) or duration_seconds (number)' }, { status: 400 });
 }
 
 export async function PATCH(request) {
   const supabaseAuth = getClientAuth(request);
   const { data: { user } } = await supabaseAuth.auth.getUser();
-  if (!user || !isOwnerEmail(user.email)) {
+  if (!user || user.email !== 'lifegrading@gmail.com') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -172,66 +147,86 @@ export async function PATCH(request) {
     return NextResponse.json({ error: 'email and action required' }, { status: 400 });
   }
 
-  const normEmail = email.toLowerCase().trim();
   const supabase = getClient();
 
-  if (action === 'add_use' || action === 'remove_use') {
-    const state = await getUserProState(supabase, normEmail);
-    const currentUses = state.free_uses_remaining ?? 3;
-    const delta = action === 'add_use' ? 1 : -1;
-    const newValue = Math.max(0, currentUses + delta);
+  if (action === 'add_use') {
+    const { data: current, error: fetchError } = await supabase
+      .from('users')
+      .select('free_uses_remaining')
+      .eq('email', email)
+      .single();
+    if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
 
-    // Write to public.pro_users table
-    let proErr = null;
-    try {
-      const { error } = await supabase
-        .from('pro_users')
-        .upsert({
-          email: normEmail,
-          is_pro: false,
-          pro_expires_at: null,
-          free_uses_remaining: newValue,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'email' });
-      if (error) proErr = error.message;
-    } catch (e) {
-      proErr = e.message;
-    }
+    const newValue = (current?.free_uses_remaining ?? 0) + 1;
+    const { error } = await supabase
+      .from('users')
+      .update({ free_uses_remaining: newValue, updated_at: new Date().toISOString() })
+      .eq('email', email);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, free_uses_remaining: newValue });
+  }
 
-    if (proErr) {
-      return NextResponse.json({ error: `Supabase error: ${proErr}` }, { status: 500 });
-    }
+  if (action === 'remove_use') {
+    const { data: current, error: fetchError } = await supabase
+      .from('users')
+      .select('free_uses_remaining')
+      .eq('email', email)
+      .single();
+    if (fetchError) return NextResponse.json({ error: fetchError.message }, { status: 500 });
 
-    // Write to public.users as well just to keep tables in sync
-    try {
-      const { data: updatedRows, error: updateErr } = await supabase
-        .from('users')
-        .update({
-          is_pro: false,
-          free_uses_remaining: newValue,
-          updated_at: new Date().toISOString(),
-        })
-        .ilike('email', normEmail)
-        .select();
-
-      if (updateErr || !updatedRows || updatedRows.length === 0) {
-        let targetAuthId = null;
-        const { data: authData } = await supabase.auth.admin.listUsers();
-        const targetAuth = authData?.users?.find(u => u.email && u.email.toLowerCase().trim() === normEmail);
-        if (targetAuth) targetAuthId = targetAuth.id;
-
-        await supabase.from('users').upsert({
-          id: targetAuthId,
-          email: normEmail,
-          is_pro: false,
-          free_uses_remaining: newValue,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'email' });
-      }
-    } catch (e) {}
-
-    return NextResponse.json({ ok: true, email: normEmail, free_uses_remaining: newValue });
+    const newValue = Math.max(0, (current?.free_uses_remaining ?? 0) - 1);
+    const { error } = await supabase
+      .from('users')
+      .update({ free_uses_remaining: newValue, updated_at: new Date().toISOString() })
+      .eq('email', email);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, free_uses_remaining: newValue });
   }
 
   return NextResponse.json({ error: 'invalid action' }, { status: 400 });
+}
+
+export async function DELETE(request) {
+  const supabaseAuth = getClientAuth(request);
+  const { data: { user } } = await supabaseAuth.auth.getUser();
+  if (!user || user.email !== 'lifegrading@gmail.com') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const email = searchParams.get('email');
+
+  if (!email) {
+    return NextResponse.json({ error: 'email required' }, { status: 400 });
+  }
+
+  const supabase = getClient();
+
+  const { data: existingUser, error: fetchError } = await supabase
+    .from('users')
+    .select('id, display_name, free_uses_remaining, is_pro')
+    .eq('email', email)
+    .single();
+
+  if (fetchError) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  if (existingUser.email === 'lifegrading@gmail.com') {
+    return NextResponse.json({ error: 'Cannot delete owner account' }, { status: 403 });
+  }
+
+  const { error } = await supabase
+    .from('users')
+    .delete()
+    .eq('email', email);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ 
+    ok: true, 
+    deleted_user: {
+      email: existingUser.email,
+      display_name: existingUser.display_name,
+      was_pro: existingUser.is_pro,
+      uses_not_refunded: true
+    }
+  });
 }

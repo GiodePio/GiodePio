@@ -4,15 +4,6 @@
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
--- Dedicated pro_users table
-create table if not exists public.pro_users (
-  email text primary key,
-  is_pro boolean default false,
-  pro_expires_at timestamptz,
-  free_uses_remaining integer default 3,
-  updated_at timestamptz default now()
-);
-
 -- Mod version tracking
 create table if not exists public.mod_versions (
   id uuid primary key default uuid_generate_v4(),
@@ -105,3 +96,29 @@ create table if not exists public.users (
   updated_at timestamptz default now(),
   last_login_at timestamptz
 );
+
+-- Ensure is_pro column exists
+DO $$ BEGIN
+  ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_pro boolean default false;
+EXCEPTION WHEN duplicate_column THEN END $$;
+
+-- Ensure free_uses_remaining column exists
+DO $$ BEGIN
+  ALTER TABLE public.users ADD COLUMN IF NOT EXISTS free_uses_remaining integer default 3;
+EXCEPTION WHEN duplicate_column THEN END $$;
+
+-- Ensure display_name column exists
+DO $$ BEGIN
+  ALTER TABLE public.users ADD COLUMN IF NOT EXISTS display_name text;
+EXCEPTION WHEN duplicate_column THEN END $$;
+
+-- Initialize free_uses_remaining for existing users
+DO $$ BEGIN
+  UPDATE public.users SET free_uses_remaining = 3 WHERE free_uses_remaining IS NULL AND is_pro = false;
+  UPDATE public.users SET free_uses_remaining = NULL WHERE is_pro = true;
+EXCEPTION WHEN others THEN END $$;
+
+-- Ensure updated_at column exists
+DO $$ BEGIN
+  ALTER TABLE public.users ADD COLUMN IF NOT EXISTS updated_at timestamptz;
+EXCEPTION WHEN duplicate_column THEN END $$;

@@ -31,6 +31,7 @@ function NavItem({ icon, label, active, onClick }) {
 export default function SettingsPage() {
   const router = useRouter();
   const [webhook, setWebhook] = useState('');
+  const [displayname, setDisplayname] = useState('');
   const [minecraftUsername, setMinecraftUsername] = useState('');
   const [saved, setSaved] = useState(false);
   const [mcSaved, setMcSaved] = useState(false);
@@ -46,14 +47,17 @@ export default function SettingsPage() {
           setUserEmail(email);
           setProChecked(true);
 
+          fetch(`/api/user/settings?email=${encodeURIComponent(email)}&include_display_name=true`)
+            .then(r => r.json())
+            .then(s => { 
+              if (s?.display_name) { setDisplayname(s.display_name); }
+              if (s?.webhook_url) setWebhook(s.webhook_url); 
+            })
+            .catch(() => {});
+
           fetch(`/api/user/minecraft?email=${encodeURIComponent(email)}`)
             .then(r => r.json())
             .then(mc => { if (mc?.username) { setMinecraftUsername(mc.username); setMcSaved(true); } })
-            .catch(() => {});
-
-          fetch(`/api/user/settings?email=${encodeURIComponent(email)}`)
-            .then(r => r.json())
-            .then(s => { if (s?.webhook_url) setWebhook(s.webhook_url); })
             .catch(() => {});
         } else {
           setProChecked(true);
@@ -61,6 +65,16 @@ export default function SettingsPage() {
       })
       .catch(() => { setProChecked(true); });
   }, []);
+
+  const handleSaveUsername = async () => {
+    if (!displayname.trim()) return;
+    const res = await fetch('/api/user/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: userEmail, display_name: displayname.trim() }),
+    });
+    if (res.ok) setSaved(true);
+  };
 
   const handleSave = async () => {
     const res = await fetch('/api/user/settings', {
@@ -136,11 +150,42 @@ export default function SettingsPage() {
       </aside>
       <div style={{ flex: 1, padding: '28px 36px' }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0' }}>Settings</h1>
-        <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Configure your notifications and account.</p>
+        <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Configure your account and notifications.</p>
 
         <div className="glass-card" style={{ borderRadius: 12, padding: 24, maxWidth: 600, marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
-            <span>👤</span> Minecraft Username
+            <span>👤</span> Username
+          </div>
+          <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 12 }}>
+            Your display name shown to others. This is your username, not your Minecraft username.
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <input
+              type="text"
+              value={displayname}
+              onChange={e => { setDisplayname(e.target.value); setSaved(false); }}
+              placeholder="Enter your username"
+              style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', transition: 'all 0.2s ease' }}
+            />
+            <button
+              onClick={handleSaveUsername}
+              disabled={!displayname.trim()}
+              className="btn-smooth"
+              style={{ background: saved ? colors.green : 'transparent', color: saved ? '#000' : colors.textDim, border: `1px solid ${saved ? colors.green : 'rgba(255,255,255,0.06)'}`, borderRadius: 8, padding: '10px 16px', fontSize: 13, fontWeight: 600, cursor: displayname.trim() ? 'pointer' : 'not-allowed' }}
+            >
+              {saved ? '✓ Saved' : 'Save'}
+            </button>
+          </div>
+          {saved && displayname && (
+            <div style={{ marginTop: 8, fontSize: 12, color: colors.green }}>
+              ✓ Username saved
+            </div>
+          )}
+        </div>
+
+        <div className="glass-card" style={{ borderRadius: 12, padding: 24, maxWidth: 600, marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
+            <span>🎮</span> Minecraft Username
           </div>
           <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 12 }}>
             Your Minecraft username links grabs from your mod to your account.
@@ -164,7 +209,7 @@ export default function SettingsPage() {
           </div>
           {mcSaved && minecraftUsername && (
             <div style={{ marginTop: 8, fontSize: 12, color: colors.green }}>
-              ✓ Username linked to <strong>{minecraftUsername}</strong>
+              ✓ Minecraft username linked
             </div>
           )}
         </div>
