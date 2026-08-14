@@ -196,7 +196,12 @@ function Dashboard({ userEmail, freeUses, isPro, trialExhausted }) {
 
 
 
-function Plans({ freeUses, isPro, trialExhausted }) {
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+
+function Plans({ freeUses, isPro, trialExhausted, userEmail }) {
+  const [promo, setPromo] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState('');
+
   return (
     <div className="page-enter" style={{ flex: 1, padding: '28px 36px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -233,8 +238,21 @@ function Plans({ freeUses, isPro, trialExhausted }) {
           <div className="glass-card" style={{ border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: 12, padding: 28, position: 'relative' }}>
             <div style={{ position: 'absolute', top: -10, left: 20, background: colors.green, color: '#000', fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 8 }}>PRO</div>
             <div style={{ fontSize: 12, color: colors.green, letterSpacing: 1, marginBottom: 6, fontWeight: 600 }}>👑 ULTIMATE GRABS</div>
-            <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$4.99</div>
-            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 4 }}> <s style={{ color: colors.red, fontSize: 22 }}>9.99</s> <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: colors.red, fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600, marginLeft: 4 }}>50% off coupon New</span></div>
+            
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12, marginTop: 12 }}>
+              <input value={promo} onChange={e => setPromo(e.target.value)} placeholder="Promo code" style={{ flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid ' + colors.border, borderRadius: 6, padding: '6px 10px', color: colors.text, fontSize: 13, outline: 'none' }} />
+              <button onClick={() => { if (promo.toLowerCase().trim() === 'new') setAppliedPromo('new'); else alert('Invalid promo code'); }} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid ' + colors.border, borderRadius: 6, padding: '6px 12px', color: colors.text, fontSize: 13, cursor: 'pointer' }}>Apply</button>
+            </div>
+
+            {appliedPromo === 'new' ? (
+              <>
+                <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$5.00<span style={{ fontSize: 16, color: colors.textDim }}>/mo</span></div>
+                <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 12 }}> <s style={{ color: colors.red, fontSize: 16 }}>$10.00</s> <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: colors.red, fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600, marginLeft: 4 }}>50% OFF</span></div>
+              </>
+            ) : (
+              <div style={{ fontSize: 36, fontWeight: 700, color: colors.text, marginBottom: 12 }}>$10.00<span style={{ fontSize: 16, color: colors.textDim }}>/mo</span></div>
+            )}
+            
             {['Unlimited sessions', 'Permanent data retention', 'Webhook notifications', 'Auth Mods & Builds', 'Remote control access', 'Priority support'].map((f, i) => (
               <div key={i} style={{ fontSize: 13, color: colors.text, marginBottom: 8, display: 'flex', gap: 8 }}>
                 <span style={{ color: colors.green }}>✓</span> {f}
@@ -243,9 +261,24 @@ function Plans({ freeUses, isPro, trialExhausted }) {
             {isPro ? (
               <button disabled className="btn-smooth" style={{ width: '100%', marginTop: 16, padding: '10px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, opacity: 0.5, cursor: 'not-allowed' }}>Active</button>
             ) : (
-              <button onClick={() => window.location.href = 'https://buy.stripe.com/pro-checkout'} className="btn-smooth" style={{ width: '100%', marginTop: 16, padding: '10px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                Upgrade to Pro
-              </button>
+              <div style={{ marginTop: 16 }}>
+                <PayPalScriptProvider options={{ "client-id": process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "test", vault: true, intent: "subscription" }}>
+                  <PayPalButtons
+                    style={{ layout: "vertical", shape: "rect", color: "blue", label: "subscribe" }}
+                    createSubscription={(data, actions) => {
+                      const planId = appliedPromo === 'new' ? process.env.NEXT_PUBLIC_PAYPAL_PLAN_DISCOUNTED : process.env.NEXT_PUBLIC_PAYPAL_PLAN_STANDARD;
+                      if (!planId) { alert("Missing PayPal Plan ID in environment!"); return; }
+                      return actions.subscription.create({
+                        plan_id: planId,
+                        custom_id: userEmail,
+                      });
+                    }}
+                    onApprove={(data, actions) => {
+                      alert("Subscription successful! Your Pro status will activate within 30 seconds.");
+                    }}
+                  />
+                </PayPalScriptProvider>
+              </div>
             )}
           </div>
         </div>
@@ -547,7 +580,7 @@ function DashboardContent({ userEmail, freeUses, isPro, trialExhausted }) {
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       <Sidebar userEmail={userEmail} />
       {page === 'dashboard' && <Dashboard userEmail={userEmail} freeUses={freeUses} isPro={isPro} trialExhausted={trialExhausted} />}
-      {page === 'plans' && <Plans freeUses={freeUses} isPro={isPro} trialExhausted={trialExhausted} />}
+      {page === 'plans' && <Plans userEmail={userEmail} freeUses={freeUses} isPro={isPro} trialExhausted={trialExhausted} />}
       {page === 'live' && <LiveCaptures />}
     </div>
   );
