@@ -141,7 +141,7 @@ export async function POST(request) {
       const { error: proUpError } = await supabase
         .from('pro_users')
         .upsert(
-          { email, is_pro: true, pro_expires_at: null },
+          { email: email.toLowerCase().trim(), is_pro: true, pro_expires_at: null },
           { onConflict: 'email' }
         );
       if (proUpError) {
@@ -154,7 +154,7 @@ export async function POST(request) {
       const { error: proDelError } = await supabase
         .from('pro_users')
         .delete()
-        .ilike('email', email);
+        .ilike('email', email.toLowerCase().trim());
       if (proDelError) {
         console.error(`[DEBUG] Delete failed for ${email}:`, proDelError);
         return NextResponse.json({ error: proDelError.message, details: proDelError }, { status: 500 });
