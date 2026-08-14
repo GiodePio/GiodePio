@@ -19,7 +19,6 @@ const colors = {
 
 export default function GrabsPage() {
   const router = useRouter();
-  const pathname = usePathname();
   const [grabs, setGrabs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
