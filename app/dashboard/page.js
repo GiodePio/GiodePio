@@ -594,23 +594,7 @@ export default function DashboardPage() {
 
   const canAccess = isPro || isOwner || freeUses > 0;
 
-  if (!canAccess) {
-    return (
-      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-          <div style={{ fontSize: 48 }}>🔒</div>
-          <div style={{ fontSize: 18, fontWeight: 600 }}>Free Trial Exhausted</div>
-          <div style={{ fontSize: 14, color: colors.textDim, textAlign: 'center', maxWidth: 400 }}>
-            You have used all 3 free captures. Upgrade to Pro for unlimited access.
-          </div>
-          <button onClick={() => setPage('plans')} style={{ cursor: 'pointer', background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>Upgrade to Pro</button>
-          <div onClick={() => window.location.href = '/api/auth/logout'} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 14, marginTop: 8 }}>
-            Log out
-          </div>
-        </div>
-      </div>
-    );
-  }
+
 
   const NavSection = ({title}) => <div style={{fontSize:10,color:colors.textDim,letterSpacing:2,textTransform:'uppercase',padding:'16px 14px 6px',fontWeight:600}}>{title}</div>;
 

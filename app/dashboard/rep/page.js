@@ -54,6 +54,7 @@ export default function RepPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [newRep, setNewRep] = useState({ type:'good', message:'' });
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [username, setUsername] = useState('');
 
   useEffect(() => {
@@ -71,13 +72,16 @@ export default function RepPage() {
   const handleSubmit = async () => {
     if(!newRep.message.trim()) return;
     setSubmitting(true);
+    setSubmitError('');
     try {
-      await fetch('/api/reps',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...newRep,author_email:userEmail,author_name:username})});
-      const d = await fetch('/api/reps').then(r=>r.json());
-      setReps(d.reps||[]);
+      const res = await fetch('/api/reps',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_email:userEmail,username:username||userEmail?.split('@')[0]||'Anonymous',tag:newRep.type==='good'?'Good':'Bad',text:newRep.message.trim()})});
+      const d = await res.json();
+      if(!res.ok){ setSubmitError(d.error||'Failed to post rep'); setSubmitting(false); return; }
+      const d2 = await fetch('/api/reps').then(r=>r.json());
+      setReps(d2.reps||[]);
       setShowCreate(false);
       setNewRep({type:'good',message:''});
-    } catch(e){}
+    } catch(e){ setSubmitError(e.message); }
     setSubmitting(false);
   };
 
@@ -157,6 +161,7 @@ export default function RepPage() {
               </div>
               <textarea value={newRep.message} onChange={e=>setNewRep(p=>({...p,message:e.target.value}))} placeholder="Write your review..." rows={4}
                 style={{width:'100%',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)',borderRadius:8,padding:'10px 14px',color:colors.text,fontSize:13,outline:'none',resize:'none',boxSizing:'border-box',marginBottom:16}}/>
+              {submitError&&<div style={{color:'#ef4444',fontSize:12,marginBottom:8,padding:'6px 10px',background:'rgba(239,68,68,0.1)',borderRadius:6}}>{submitError}</div>}
               <button onClick={handleSubmit} disabled={!newRep.message.trim()||submitting}
                 style={{width:'100%',padding:'12px',background:newRep.message.trim()&&!submitting?colors.green:'#333',color:'#000',border:'none',borderRadius:8,fontSize:14,fontWeight:700,cursor:newRep.message.trim()&&!submitting?'pointer':'not-allowed'}}>
                 {submitting?'Posting...':'Post Rep'}

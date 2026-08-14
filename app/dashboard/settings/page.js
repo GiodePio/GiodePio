@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 const colors = {
   bg: '#050508',
@@ -30,6 +30,8 @@ function NavItem({ icon, label, active, onClick }) {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const isActive = (p) => pathname === p || pathname.startsWith(p + '/');
   const [webhook, setWebhook] = useState('');
   const [displayname, setDisplayname] = useState('');
   const [minecraftUsername, setMinecraftUsername] = useState('');
@@ -132,19 +134,20 @@ export default function SettingsPage() {
           <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
         </div>
         <div style={{ flex: 1 }}>
-          <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
-          <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
-          <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
-          {userEmail === 'lifegrading@gmail.com' && (
-            <NavItem icon="👥" label="Admin" onClick={() => router.push('/admin')} />
-          )}
-          <NavItem icon="📋" label="Plans" onClick={() => router.push('/dashboard')} />
-          <NavItem icon="⭐" label="+Rep" onClick={() => router.push('/dashboard')} />
+          <NavItem icon="📊" label="Dashboard" active={isActive('/dashboard') && !isActive('/dashboard/grabs') && !isActive('/dashboard/build') && !isActive('/dashboard/remote-control') && !isActive('/dashboard/rep') && !isActive('/dashboard/updates') && !isActive('/dashboard/leaderboard') && !isActive('/dashboard/tickets') && !isActive('/dashboard/settings')} onClick={() => router.push('/dashboard')} />
+          <NavItem icon="⚡" label="Grabs" active={isActive('/dashboard/grabs')} onClick={() => router.push('/dashboard/grabs')} />
+          <NavItem icon="🔨" label="Build" active={isActive('/dashboard/build')} onClick={() => router.push('/dashboard/build')} />
           <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
-          <NavItem icon="🖥" label="Remote Control" onClick={() => router.push('/dashboard/remote-control')} />
+          <NavItem icon="🖥" label="Remote Control" active={isActive('/dashboard/remote-control')} onClick={() => router.push('/dashboard/remote-control')} />
+          <NavItem icon="⭐" label="+Rep" active={isActive('/dashboard/rep')} onClick={() => router.push('/dashboard/rep')} />
+          <NavItem icon="📢" label="Updates" active={isActive('/dashboard/updates')} onClick={() => router.push('/dashboard/updates')} />
+          <NavItem icon="🏆" label="Leaderboard" active={isActive('/dashboard/leaderboard')} onClick={() => router.push('/dashboard/leaderboard')} />
+          <NavItem icon="💬" label="Join Discord" onClick={() => window.open('https://discord.gg/FV2668v4Zp','_blank')} />
+          <NavItem icon="🎫" label="Tickets" active={isActive('/dashboard/tickets')} onClick={() => router.push('/dashboard/tickets')} />
+          {userEmail === 'lifegrading@gmail.com' && <NavItem icon="👥" label="Admin" active={isActive('/admin')} onClick={() => router.push('/admin')} />}
         </div>
         <div>
-          <NavItem icon="⚙️" label="Settings" active onClick={() => {}} />
+          <NavItem icon="⚙️" label="Settings" active={isActive('/dashboard/settings')} onClick={() => router.push('/dashboard/settings')} />
           <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
         </div>
       </aside>
