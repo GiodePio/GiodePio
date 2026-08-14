@@ -17,7 +17,7 @@ export default function LivestreamPage() {
       if (imgRef.current) {
         imgRef.current.src = '/api/latest?t=' + Date.now();
       }
-    }, 500);
+    }, 33);
     return () => clearInterval(interval);
   }, []);
 
