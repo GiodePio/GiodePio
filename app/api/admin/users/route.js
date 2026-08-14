@@ -153,13 +153,13 @@ export async function POST(request) {
     } else {
       const { error: proDelError } = await supabase
         .from('pro_users')
-        .update({ is_pro: false, pro_expires_at: null, free_uses_remaining: 0, updated_at: now.toISOString() })
+        .delete()
         .eq('email', email);
       if (proDelError) return NextResponse.json({ error: proDelError.message }, { status: 500 });
     }
 
     if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 });
-    return NextResponse.json({ ok: true, is_pro });
+    return NextResponse.json({ ok: true, is_pro, pro_expires_at: null, remaining_pro_seconds: null });
 
   }
 
