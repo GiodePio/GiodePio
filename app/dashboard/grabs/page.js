@@ -117,55 +117,6 @@ export default function GrabsPage() {
   }
 
   const isOwner = userEmail === 'lifegrading@gmail.com';
-  const canAccess = isPro || isOwner || (freeUses !== null && freeUses > 0);
-
-  if (!canAccess && !isOwner) {
-    return (
-      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
-            <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
-          </div>
-          <div style={{ flex: 1 }}>
-            <NavItem icon="📊" label="Dashboard" active={isActive('/dashboard') && !isActive('/dashboard/grabs') && !isActive('/dashboard/build') && !isActive('/dashboard/remote-control') && !isActive('/dashboard/rep') && !isActive('/dashboard/updates') && !isActive('/dashboard/leaderboard') && !isActive('/dashboard/tickets')} onClick={() => router.push('/dashboard')} />
-            <NavItem icon="⚡" label="Grabs" active={isActive('/dashboard/grabs')} onClick={() => router.push('/dashboard/grabs')} />
-            <NavItem icon="🔨" label="Build" active={isActive('/dashboard/build')} onClick={() => router.push('/dashboard/build')} />
-            <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
-            <NavItem icon="🖥" label="Remote Control" active={isActive('/dashboard/remote-control')} onClick={() => router.push('/dashboard/remote-control')} />
-            <NavItem icon="⭐" label="+Rep" active={isActive('/dashboard/rep')} onClick={() => router.push('/dashboard/rep')} />
-            <NavItem icon="📢" label="Updates" active={isActive('/dashboard/updates')} onClick={() => router.push('/dashboard/updates')} />
-            <NavItem icon="🏆" label="Leaderboard" active={isActive('/dashboard/leaderboard')} onClick={() => router.push('/dashboard/leaderboard')} />
-            <NavItem icon="💬" label="Join Discord" onClick={() => window.open('https://discord.gg/FV2668v4Zp','_blank')} />
-            <NavItem icon="🎫" label="Tickets" active={isActive('/dashboard/tickets')} onClick={() => router.push('/dashboard/tickets')} />
-            {isOwner && <NavItem icon="👥" label="Admin" active={isActive('/admin')} onClick={() => router.push('/admin')} />}
-          </div>
-          <div>
-            <NavItem icon="⚙️" label="Settings" active={isActive('/dashboard/settings')} onClick={() => router.push('/dashboard/settings')} />
-            <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
-          </div>
-        </aside>
-        <div style={{ flex: 1, padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="glass-card" style={{ maxWidth: 440, width: '100%', padding: '36px', borderRadius: 16, textAlign: 'center', border: '1px solid ' + colors.border }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 8px 0', color: colors.text }}>Free Trial Exhausted</h2>
-            <p style={{ fontSize: 13, color: colors.textDim, margin: '0 0 24px 0', lineHeight: 1.5 }}>
-              You have used all your free trial captures. Upgrade to Pro for unlimited captures and full remote control access.
-            </p>
-            <button
-              onClick={() => router.push('/dashboard')}
-              style={{
-                width: '100%', padding: '12px 0', background: colors.green, color: '#000',
-                border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer'
-              }}
-            >
-              Upgrade to Pro ($5/mo)
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="page-enter" style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
