@@ -46,17 +46,15 @@ function Sidebar({ userEmail, router }) {
   );
 }
 
-const updates = [
-  { version:'v1.3.0', date:'2026-08-13', tag:'New', color:'#22c55e', title:'Pro Rank System', body:'Pro rank is now fully integrated with Supabase. Admins can grant/revoke pro from the admin panel. Pro users get unlimited captures and access to all features.' },
-  { version:'v1.2.0', date:'2026-08-01', tag:'Feature', color:'#3b82f6', title:'Leaderboard & +Rep', body:'Added a global leaderboard tracking all captures per user, and a community +Rep system to rate other users.' },
-  { version:'v1.1.0', date:'2026-07-15', tag:'Fix', color:'#f59e0b', title:'Build & Remote Control Improvements', body:'Fixed case-sensitive email lookups in Supabase. Improved remote control stability and live capture streaming.' },
-  { version:'v1.0.0', date:'2026-07-01', tag:'Launch', color:'#a855f7', title:'LifeGrabber Launched', body:'Initial launch of LifeGrabber. Profile lookups, grabs, Discord webhooks, and the mod builder are now live.' },
-];
-
 export default function UpdatesPage() {
-  const router = useRouter();
   const [userEmail, setUserEmail] = useState('');
-  useEffect(()=>{ fetch('/api/auth/user').then(r=>r.json()).then(d=>{ if(d.user) setUserEmail(d.user.email); }); },[]);
+  const [updates, setUpdates] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(()=>{ 
+    fetch('/api/auth/user').then(r=>r.json()).then(d=>{ if(d.user) setUserEmail(d.user.email); }); 
+    fetch('/api/updates').then(r=>r.json()).then(d=>{ setUpdates(d.updates || []); setLoading(false); }).catch(()=>setLoading(false));
+  },[]);
 
   return (
     <div style={{display:'flex',minHeight:'100vh',background:colors.bg,color:colors.text,fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif'}}>
@@ -65,6 +63,7 @@ export default function UpdatesPage() {
         <h1 style={{fontSize:22,fontWeight:700,margin:'0 0 4px'}}>📢 Updates</h1>
         <p style={{color:colors.textDim,fontSize:13,margin:'0 0 28px'}}>What's new in LifeGrabber.</p>
         <div style={{display:'flex',flexDirection:'column',gap:16,maxWidth:700}}>
+          {loading ? <div style={{color:colors.textDim}}>Loading updates...</div> : updates.length === 0 ? <div style={{color:colors.textDim}}>No updates found.</div> : null}
           {updates.map((u,i)=>(
             <div key={i} className="glass-card" style={{borderRadius:12,padding:'20px 24px',borderLeft:`3px solid ${u.color}`}}>
               <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>

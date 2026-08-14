@@ -47,7 +47,6 @@ function Sidebar({ userEmail, router }) {
 }
 
 export default function TicketsPage() {
-  const router = useRouter();
   const [userEmail, setUserEmail] = useState('');
   const [tickets, setTickets] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -55,30 +54,44 @@ export default function TicketsPage() {
   const [newTicket, setNewTicket] = useState({ subject:'', message:'' });
   const [submitting, setSubmitting] = useState(false);
   const [chatMsg, setChatMsg] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/auth/user').then(r=>r.json()).then(d=>{ if(d.user) setUserEmail(d.user.email); });
+    fetch('/api/tickets').then(r=>r.json()).then(d=>{ setTickets(d.tickets || []); setLoading(false); }).catch(()=>setLoading(false));
   },[]);
 
   const handleCreate = async () => {
     if(!newTicket.subject.trim()||!newTicket.message.trim()) return;
     if(tickets.length>=3) return alert('Max 3 open tickets');
     setSubmitting(true);
-    const ticket = { id: Date.now().toString(), subject: newTicket.subject, message: newTicket.message, status:'open', created_at: new Date().toISOString(), messages:[{sender:'user',email:userEmail,text:newTicket.message,at:new Date().toISOString()}] };
-    setTickets(p=>[...p, ticket]);
+    const res = await fetch('/api/tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject: newTicket.subject, messages: [{ sender:'user', text:newTicket.message, at:new Date().toISOString() }] })
+    });
+    if (res.ok) {
+      const { ticket } = await res.json();
+      setTickets(p => [ticket, ...p]);
+      setSelected(ticket);
+    }
     setNewTicket({subject:'',message:''});
     setShowNew(false);
-    setSelected(ticket);
     setSubmitting(false);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if(!chatMsg.trim()||!selected) return;
-    const msg = {sender:'user',email:userEmail,text:chatMsg,at:new Date().toISOString()};
+    const msg = {sender:'user',text:chatMsg,at:new Date().toISOString()};
     const updated = {...selected, messages:[...(selected.messages||[]),msg]};
     setSelected(updated);
     setTickets(p=>p.map(t=>t.id===selected.id?updated:t));
     setChatMsg('');
+    await fetch('/api/tickets', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: selected.id, message: msg })
+    });
   };
 
   const timeAgo = (ts) => { const d=Math.floor((Date.now()-new Date(ts))/86400000); return d===0?'today':`${d}d ago`; };
@@ -107,8 +120,7 @@ export default function TicketsPage() {
           {/* Ticket list */}
           <div className="glass-card" style={{borderRadius:12,overflow:'auto'}}>
             <div style={{padding:'10px 14px',fontSize:10,color:colors.textDim,letterSpacing:2,textTransform:'uppercase',fontWeight:600,borderBottom:'1px solid rgba(255,255,255,0.06)'}}>YOUR SUPPORT TICKETS</div>
-            {tickets.length===0&&<div style={{padding:'40px 16px',textAlign:'center',color:colors.textDim,fontSize:12}}>No support tickets found. Click "New Support Ticket" to create one.</div>}
-            {tickets.map(t=>(
+            {loading ? <div style={{padding:'40px 16px',textAlign:'center',color:colors.textDim,fontSize:12}}>Loading...</div> : tickets.length===0 ? <div style={{padding:'40px 16px',textAlign:'center',color:colors.textDim,fontSize:12}}>No support tickets found. Click "New Support Ticket" to create one.</div> : tickets.map(t=>(
               <div key={t.id} onClick={()=>setSelected(t)}
                 style={{padding:'12px 14px',cursor:'pointer',borderBottom:'1px solid rgba(255,255,255,0.04)',background:selected?.id===t.id?'rgba(59,130,246,0.08)':'transparent'}}>
                 <div style={{fontWeight:600,fontSize:13,marginBottom:2}}>{t.subject}</div>
