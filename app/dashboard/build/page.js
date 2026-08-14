@@ -192,8 +192,11 @@ export default function BuildPage() {
             </div>
 
             <div className="glass-card" style={{ borderRadius: 12, padding: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 14, fontWeight: 600, color: colors.text }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.text }}>
                 <span>🛡️</span> Build AuthMe Login
+              </div>
+              <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 16 }}>
+                Allows to login with session id
               </div>
               <div style={{ fontSize: 12, color: colors.textDim, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>VERSION</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
