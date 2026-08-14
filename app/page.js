@@ -125,7 +125,7 @@ function Pricing() {
           <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: colors.green, color: '#000', fontSize: 11, fontWeight: 700, padding: '4px 14px', borderRadius: 12 }}>Most popular</div>
           <div style={{ fontSize: 14, color: colors.textDim, fontWeight: 600, marginBottom: 6 }}>👑 Ultimate Grabs</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 24 }}>
-            <span style={{ fontSize: 48, fontWeight: 800, color: colors.text }}>$5</span>
+            <span style={{ fontSize: 48, fontWeight: 800, color: colors.text }}>$4.99</span>
             <span style={{ fontSize: 14, color: colors.textDim }}>/ month</span>
           </div>
           {[

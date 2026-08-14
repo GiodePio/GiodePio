@@ -246,11 +246,11 @@ function Plans({ freeUses, isPro, trialExhausted, userEmail }) {
 
             {appliedPromo === 'new' ? (
               <>
-                <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$5.00<span style={{ fontSize: 16, color: colors.textDim }}>/mo</span></div>
-                <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 12 }}> <s style={{ color: colors.red, fontSize: 16 }}>$10.00</s> <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: colors.red, fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600, marginLeft: 4 }}>50% OFF</span></div>
+                <div style={{ fontSize: 36, fontWeight: 700, color: colors.text }}>$4.99<span style={{ fontSize: 16, color: colors.textDim }}>/mo</span></div>
+                <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 12 }}> <s style={{ color: colors.red, fontSize: 16 }}>$9.99</s> <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: colors.red, fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600, marginLeft: 4 }}>50% OFF</span></div>
               </>
             ) : (
-              <div style={{ fontSize: 36, fontWeight: 700, color: colors.text, marginBottom: 12 }}>$10.00<span style={{ fontSize: 16, color: colors.textDim }}>/mo</span></div>
+              <div style={{ fontSize: 36, fontWeight: 700, color: colors.text, marginBottom: 12 }}>$9.99<span style={{ fontSize: 16, color: colors.textDim }}>/mo</span></div>
             )}
             
             {['Unlimited sessions', 'Permanent data retention', 'Webhook notifications', 'Auth Mods & Builds', 'Remote control access', 'Priority support'].map((f, i) => (
