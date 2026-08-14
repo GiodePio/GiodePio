@@ -47,6 +47,7 @@ function Sidebar({ userEmail, router }) {
 }
 
 export default function UpdatesPage() {
+  const router = useRouter();
   const [userEmail, setUserEmail] = useState('');
   const [updates, setUpdates] = useState([]);
   const [loading, setLoading] = useState(true);

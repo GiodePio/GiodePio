@@ -47,6 +47,7 @@ function Sidebar({ userEmail, router }) {
 }
 
 export default function TicketsPage() {
+  const router = useRouter();
   const [userEmail, setUserEmail] = useState('');
   const [tickets, setTickets] = useState([]);
   const [selected, setSelected] = useState(null);
