@@ -36,49 +36,60 @@ export async function GET(request) {
 
   const supabase = getClient();
 
-  const { data: users, error } = await supabase
+  const { data: usersBasic, error: errorBasic } = await supabase
     .from('users')
-    .select('id, email, display_name, is_pro, free_uses_remaining, created_at, last_login_at')
+    .select('id, email, display_name, created_at')
     .order('created_at', { ascending: false });
 
-  if (error) {
-    const { data: usersBasic, error: errorBasic } = await supabase
-      .from('users')
-      .select('id, email, display_name, created_at')
-      .order('created_at', { ascending: false });
-    if (errorBasic) {
-      return NextResponse.json({ error: error.message, details: errorBasic.message }, { status: 500 });
+  if (errorBasic) {
+    return NextResponse.json({ error: errorBasic.message }, { status: 500 });
+  }
+
+  // Fetch pro_users to determine is_pro correctly
+  const { data: proUsersData } = await supabase
+    .from('pro_users')
+    .select('email, is_pro, pro_expires_at');
+    
+  const proMap = {};
+  if (proUsersData) {
+    proUsersData.forEach(p => {
+      if (p.email) proMap[p.email.toLowerCase()] = p;
+    });
+  }
+
+  const mapped = (usersBasic || []).map(u => {
+    const emailLower = u.email ? u.email.toLowerCase() : '';
+    const proInfo = proMap[emailLower];
+    const isOwner = emailLower === 'lifegrading@gmail.com';
+    let is_pro = isOwner;
+    let remaining_pro_seconds = null;
+
+    if (proInfo && proInfo.is_pro) {
+      is_pro = true;
+      if (proInfo.pro_expires_at) {
+        const exp = new Date(proInfo.pro_expires_at);
+        const now = new Date();
+        if (now < exp) {
+          remaining_pro_seconds = Math.max(0, Math.floor((exp - now) / 1000));
+        } else {
+          is_pro = false; // Expired
+        }
+      }
     }
-    const mapped = (usersBasic || []).map(u => ({
+
+    return {
       id: u.id,
       email: u.email,
       display_name: u.display_name || null,
-      is_pro: u.email === 'lifegrading@gmail.com',
-      free_uses_remaining: u.email === 'lifegrading@gmail.com' ? null : 3,
+      is_pro: is_pro,
+      free_uses_remaining: is_pro ? null : 3, // Fallback since we don't store it in users anymore
+      remaining_pro_seconds: remaining_pro_seconds,
       created_at: u.created_at,
       last_login_at: null,
-    }));
-    return NextResponse.json({ users: mapped, columns_missing: true, error: 'Database columns missing' });
-  }
+    };
+  });
 
-  if (!users || users.length === 0) {
-    const { data: authUsers, error: authError } = await supabase
-      .from('users')
-      .select('id, email, created_at');
-    if (authError) return NextResponse.json({ users: [] });
-    const mapped = (authUsers || []).map(u => ({
-      id: u.id,
-      email: u.email,
-      display_name: null,
-      is_pro: u.email === 'lifegrading@gmail.com',
-      free_uses_remaining: u.email === 'lifegrading@gmail.com' ? null : 3,
-      created_at: u.created_at,
-      last_login_at: null,
-    }));
-    return NextResponse.json({ users: mapped, fallback: true });
-  }
-
-  return NextResponse.json({ users: users || [] });
+  return NextResponse.json({ users: mapped });
 }
 
 export async function POST(request) {
@@ -129,7 +140,7 @@ export async function POST(request) {
       const { error: proUpError } = await supabase
         .from('pro_users')
         .upsert(
-          { email, is_pro: true, pro_expires_at: null },
+          { email, is_pro: true },
           { onConflict: 'email' }
         );
       if (proUpError) return NextResponse.json({ error: proUpError.message }, { status: 500 });
@@ -137,7 +148,7 @@ export async function POST(request) {
       const { error: proDelError } = await supabase
         .from('pro_users')
         .delete()
-        .eq('email', email);
+        .ilike('email', email);
       if (proDelError) return NextResponse.json({ error: proDelError.message }, { status: 500 });
     }
     return NextResponse.json({ ok: true, is_pro, pro_expires_at: null, remaining_pro_seconds: null });
