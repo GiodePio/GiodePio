@@ -44,7 +44,10 @@ export async function GET(request, { params }) {
 
   if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  if (user.email !== 'lifegrading@gmail.com' && data.owner_email !== user.email) {
+  const userEmail = user.email?.toLowerCase().trim();
+  const isOwner = userEmail === 'lifegrading@gmail.com';
+
+  if (!isOwner && data.owner_email !== userEmail && data.owner_email !== user.email) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -67,7 +70,10 @@ export async function DELETE(request, { params }) {
     .eq('id', id)
     .single();
 
-  if (user.email !== 'lifegrading@gmail.com' && grab?.owner_email !== user.email) {
+  const userEmail = user.email?.toLowerCase().trim();
+  const isOwner = userEmail === 'lifegrading@gmail.com';
+
+  if (!isOwner && grab?.owner_email !== userEmail && grab?.owner_email !== user.email) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

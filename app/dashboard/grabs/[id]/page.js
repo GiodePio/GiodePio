@@ -67,8 +67,9 @@ export default function GrabDetailPage() {
       .then(r => r.json())
       .then(d => {
         if (d.user?.email) {
-          setUserEmail(d.user.email);
-          if (d.user.email === 'lifegrading@gmail.com') {
+          const normEmail = d.user.email.toLowerCase().trim();
+          setUserEmail(normEmail);
+          if (normEmail === 'lifegrading@gmail.com') {
             setIsPro(true);
             setProChecked(true);
           } else {
