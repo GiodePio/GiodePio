@@ -124,9 +124,15 @@ function Pricing() {
         <div style={{ background: '#111218', border: '1px solid #22c55e', borderRadius: 14, padding: 32, position: 'relative' }}>
           <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: colors.green, color: '#000', fontSize: 11, fontWeight: 700, padding: '4px 14px', borderRadius: 12 }}>Most popular</div>
           <div style={{ fontSize: 14, color: colors.textDim, fontWeight: 600, marginBottom: 6 }}>👑 Ultimate Grabs</div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 24 }}>
+          {/* Price row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
             <span style={{ fontSize: 48, fontWeight: 800, color: colors.text }}>$4.99</span>
             <span style={{ fontSize: 14, color: colors.textDim }}>/ month</span>
+            <span style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 8 }}>50% OFF</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+            <s style={{ fontSize: 14, color: '#6b6e7b' }}>$9.99/mo</s>
+            <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 600 }}>— Limited time offer, available now</span>
           </div>
           {[
             'Unlimited sessions',
@@ -142,7 +148,7 @@ function Pricing() {
               <span style={{ color: colors.green, fontWeight: 'bold' }}>✓</span> {feat}
             </div>
           ))}
-          <button onClick={() => window.location.href = 'https://buy.stripe.com/pro-checkout'} style={{ width: '100%', marginTop: 24, padding: '14px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Upgrade for $5/mo</button>
+          <button onClick={() => window.location.href = 'https://buy.stripe.com/pro-checkout'} style={{ width: '100%', marginTop: 24, padding: '14px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Upgrade for $4.99/mo</button>
         </div>
       </div>
     </section>
