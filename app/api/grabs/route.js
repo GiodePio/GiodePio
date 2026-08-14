@@ -95,9 +95,7 @@ export async function GET(request) {
       .eq('email', user.email)
       .single();
 
-    if (userData && !userData.is_pro && (userData.free_uses_remaining ?? 3) <= 0) {
-      return NextResponse.json({ grabs: [], trial_exhausted: true });
-    }
+    const isTrialExhausted = userData && !userData.is_pro && (userData.free_uses_remaining ?? 3) <= 0;
 
     const { data, error } = await supabase
       .from('grabs')
@@ -106,7 +104,7 @@ export async function GET(request) {
       .order('created_at', { ascending: false });
 
     if (error) return NextResponse.json({ grabs: [], error: error.message });
-    return NextResponse.json({ grabs: data || [] });
+    return NextResponse.json({ grabs: data || [], trial_exhausted: isTrialExhausted });
   } catch (e) {
     return NextResponse.json({ grabs: [], error: e.message });
   }

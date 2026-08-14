@@ -58,7 +58,7 @@ export async function GET(request) {
       created_at: u.created_at,
       last_login_at: null,
     }));
-    return NextResponse.json({ users: mapped, columns_missing: true, error: 'Database columns missing - run schema.sql' });
+    return NextResponse.json({ users: mapped, columns_missing: true, error: 'Database columns missing' });
   }
 
   if (!users || users.length === 0) {
@@ -96,32 +96,64 @@ export async function POST(request) {
   }
 
   const supabase = getClient();
+  const now = new Date();
 
   if (typeof is_pro === 'boolean') {
-    const updates = { is_pro, updated_at: new Date().toISOString() };
-    const { error } = await supabase
+    const updates = { is_pro, updated_at: now.toISOString() };
+    const { error: usersError } = await supabase
       .from('users')
       .update(updates)
       .eq('email', email);
 
-    if (error) return NextResponse.json({ error: error.message, details: error.hint }, { status: 500 });
+    // Also update pro_users table
+    if (is_pro) {
+      const { error: proUpError } = await supabase
+        .from('pro_users')
+        .upsert(
+          { email, is_pro: true, pro_expires_at: null, updated_at: now.toISOString() },
+          { onConflict: 'email' }
+        );
+      if (proUpError) return NextResponse.json({ error: proUpError.message }, { status: 500 });
+    } else {
+      const { error: proDelError } = await supabase
+        .from('pro_users')
+        .delete()
+        .eq('email', email);
+      if (proDelError) return NextResponse.json({ error: proDelError.message }, { status: 500 });
+    }
+
+    if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 });
     return NextResponse.json({ ok: true, is_pro });
   }
 
   if (typeof duration_seconds === 'number') {
-    const now = new Date();
     const expiresAt = new Date(now.getTime() + duration_seconds * 1000);
     const updates = { 
       is_pro: true, 
       pro_expires_at: expiresAt.toISOString(),
       updated_at: now.toISOString() 
     };
-    const { error } = await supabase
+    const { error: usersError } = await supabase
       .from('users')
       .update(updates)
       .eq('email', email);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // Also update pro_users table
+    const { error: proUpError } = await supabase
+      .from('pro_users')
+      .upsert(
+        { 
+          email, 
+          is_pro: true, 
+          pro_expires_at: expiresAt.toISOString(),
+          updated_at: now.toISOString() 
+        },
+        { onConflict: 'email' }
+      );
+
+    if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 });
+    if (proUpError) return NextResponse.json({ error: proUpError.message }, { status: 500 });
+    
     return NextResponse.json({ 
       ok: true, 
       is_pro: true, 
@@ -212,6 +244,9 @@ export async function DELETE(request) {
   if (existingUser.email === 'lifegrading@gmail.com') {
     return NextResponse.json({ error: 'Cannot delete owner account' }, { status: 403 });
   }
+
+  // Delete from pro_users first if exists
+  await supabase.from('pro_users').delete().eq('email', email);
 
   const { error } = await supabase
     .from('users')
