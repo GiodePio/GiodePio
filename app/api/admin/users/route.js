@@ -100,7 +100,11 @@ export async function POST(request) {
   }
 
   const body = await request.json();
-  const { email, is_pro, duration_seconds } = body;
+  let { email, is_pro, duration_seconds } = body;
+  
+  if (email) {
+    email = email.toLowerCase().trim();
+  }
 
   if (!email) {
     return NextResponse.json({ error: 'email required' }, { status: 400 });
