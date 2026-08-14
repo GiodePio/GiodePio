@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 
 const colors = {
@@ -33,6 +33,9 @@ function NavItem({ icon, label, active, onClick }) {
 
 export default function GrabsPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const isActive = (p) => pathname === p;
+  
   const [grabs, setGrabs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -42,6 +45,8 @@ export default function GrabsPage() {
   const [trialExhausted, setTrialExhausted] = useState(false);
   const [proChecked, setProChecked] = useState(false);
   const [, setTick] = useState(0);
+
+  const isOwner = userEmail === 'lifegrading@gmail.com';
 
 
   useEffect(() => {
