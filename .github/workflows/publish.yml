@@ -1,0 +1,42 @@
+name: publish
+on:
+  push:
+    branches: [main]
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: checkout mod repo
+        uses: actions/checkout@v6
+
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'microsoft'
+
+      - name: make gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: build mod
+        run: ./gradlew build
+
+      - name: checkout website repo
+        uses: actions/checkout@v6
+        with:
+          repository: giodepio/giodepio
+          token: ${{ secrets.PUSH_TOKEN }}
+          path: website
+
+      - name: copy jar to website
+        run: cp build/libs/consentmod-*.jar website/public/mods/consentmod-1.0.0.jar
+
+      - name: commit and push
+        run: |
+          cd website
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add public/mods/consentmod-1.0.0.jar
+          git diff --staged --quiet || git commit -m "Update consentmod JAR"
+          git push

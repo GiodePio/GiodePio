@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "consentmod",
+  "version": "${version}",
+  "name": "Consent Data Mod",
+  "description": "Collects user data on join. Consent accepted on Modrinth download page.",
+  "authors": ["You"],
+  "contact": {},
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["com.consentmod.ConsentMod"]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
