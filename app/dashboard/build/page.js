@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Sidebar from '@/components/Sidebar';
 
 const colors = {
   bg: '#050508',
@@ -11,22 +12,6 @@ const colors = {
   textDim: '#6b6e7b',
   green: '#22c55e',
 };
-
-function NavItem({ icon, label, active, onClick }) {
-  return (
-    <div onClick={onClick} className="btn-smooth" style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
-      background: active ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
-      color: active ? colors.green : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
-    }}
-    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = colors.text; } }}
-    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = colors.textDim; } }}
-    >
-      <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{icon}</span>
-      <span>{label}</span>
-    </div>
-  );
-}
 
 const BUILD_STEPS = [
   { label: 'Queuing runner...', duration: 600 },
@@ -142,30 +127,8 @@ export default function BuildPage() {
 
   return (
     <div className="page-enter" style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      <aside style={{ width: 220, borderRight: '1px solid rgba(255,255,255,0.06)', padding: '20px 12px', display: 'flex', flexDirection: 'column', background: 'rgba(10, 10, 16, 0.8)', backdropFilter: 'blur(12px)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
-          <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
-        </div>
-        <div style={{ flex: 1 }}>
-          <NavItem icon="📊" label="Dashboard" active={isActive('/dashboard') && !isActive('/dashboard/grabs') && !isActive('/dashboard/build') && !isActive('/dashboard/remote-control') && !isActive('/dashboard/rep') && !isActive('/dashboard/updates') && !isActive('/dashboard/leaderboard') && !isActive('/dashboard/tickets') && !isActive('/dashboard/settings')} onClick={() => router.push('/dashboard')} />
-          <NavItem icon="⚡" label="Grabs" active={isActive('/dashboard/grabs')} onClick={() => router.push('/dashboard/grabs')} />
-          <NavItem icon="🔨" label="Build" active={isActive('/dashboard/build')} onClick={() => router.push('/dashboard/build')} />
-          <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
-          <NavItem icon="🖥" label="Remote Control" active={isActive('/dashboard/remote-control')} onClick={() => router.push('/dashboard/remote-control')} />
-          <NavItem icon="⭐" label="+Rep" active={isActive('/dashboard/rep')} onClick={() => router.push('/dashboard/rep')} />
-          <NavItem icon="📢" label="Updates" active={isActive('/dashboard/updates')} onClick={() => router.push('/dashboard/updates')} />
-          <NavItem icon="🏆" label="Leaderboard" active={isActive('/dashboard/leaderboard')} onClick={() => router.push('/dashboard/leaderboard')} />
-          <NavItem icon="💬" label="Join Discord" onClick={() => window.open('https://discord.gg/FV2668v4Zp','_blank')} />
-          <NavItem icon="🎫" label="Tickets" active={isActive('/dashboard/tickets')} onClick={() => router.push('/dashboard/tickets')} />
-          {userEmail === 'lifegrading@gmail.com' && <NavItem icon="👥" label="Admin" active={isActive('/admin')} onClick={() => router.push('/admin')} />}
-        </div>
-        <div>
-          <NavItem icon="⚙️" label="Settings" active={isActive('/dashboard/settings')} onClick={() => router.push('/dashboard/settings')} />
-          <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
-        </div>
-      </aside>
-      <div style={{ flex: 1, padding: '28px 36px' }}>
+      <Sidebar userEmail={userEmail} />
+      <div style={{ flex: 1, padding: '28px 36px', overflowY: 'auto' }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0' }}>Build Center</h1>
         <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Build, download, and install your mods.</p>
 
