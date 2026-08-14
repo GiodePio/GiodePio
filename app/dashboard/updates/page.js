@@ -1,50 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Sidebar from '@/components/Sidebar';
 
 const colors = { bg:'#050508', border:'rgba(255,255,255,0.06)', text:'#f0f0f0', textDim:'#6b6e7b', green:'#22c55e', blue:'#3b82f6', panel:'rgba(13,13,18,0.7)' };
 
-function Sidebar({ userEmail, router }) {
-  const nav = (path) => router.push(path);
-  const Item = ({ icon, label, active, onClick }) => (
-    <div onClick={onClick} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderRadius:8, background: active?'rgba(34,197,94,0.08)':'transparent', color: active?colors.green:colors.textDim, fontSize:14, cursor:'pointer', marginBottom:2 }}
-      onMouseEnter={e=>{ if(!active){e.currentTarget.style.background='rgba(255,255,255,0.03)';e.currentTarget.style.color=colors.text;} }}
-      onMouseLeave={e=>{ if(!active){e.currentTarget.style.background='transparent';e.currentTarget.style.color=colors.textDim;} }}>
-      <span style={{fontSize:16,width:20,textAlign:'center'}}>{icon}</span><span>{label}</span>
-    </div>
-  );
-  const Section = ({title}) => <div style={{fontSize:10,color:colors.textDim,letterSpacing:2,textTransform:'uppercase',padding:'16px 14px 6px',fontWeight:600}}>{title}</div>;
-  return (
-    <aside style={{width:220,borderRight:'1px solid rgba(255,255,255,0.06)',padding:'20px 12px',display:'flex',flexDirection:'column',background:'rgba(10,10,16,0.8)',backdropFilter:'blur(12px)'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,padding:'0 10px',marginBottom:28}}>
-        <div style={{width:28,height:28,borderRadius:6,background:'rgba(34,197,94,0.15)'}}/><span style={{fontSize:14,fontWeight:600}}>LifeGrabber</span>
-      </div>
-      <div style={{flex:1}}>
-        <Section title="OVERVIEW"/>
-        <Item icon="📊" label="Dashboard" onClick={()=>nav('/dashboard')}/>
-        <Item icon="📋" label="Plans" onClick={()=>nav('/dashboard')}/>
-        <Section title="MANAGEMENT"/>
-        <Item icon="⚡" label="Grabs" onClick={()=>nav('/dashboard/grabs')}/>
-        <Item icon="📡" label="Live Captures" onClick={()=>nav('/dashboard/live')}/>
-        <Item icon="🖥" label="Remote Control" onClick={()=>nav('/dashboard/remote-control')}/>
-        <Section title="UTILITIES"/>
-        <Item icon="🔨" label="Build" onClick={()=>nav('/dashboard/build')}/>
-        <Section title="COMMUNITY & ACCESS"/>
-        <Item icon="⭐" label="+Rep" onClick={()=>nav('/dashboard/rep')}/>
-        <Item icon="📢" label="Updates" active onClick={()=>{}}/>
-        <Item icon="🏆" label="Leaderboard" onClick={()=>nav('/dashboard/leaderboard')}/>
-        <Section title="SYSTEM & SUPPORT"/>
-        <Item icon="💬" label="Join Discord" onClick={()=>window.open('https://discord.gg/FV2668v4Zp','_blank')}/>
-        <Item icon="🎫" label="Tickets" onClick={()=>nav('/dashboard/tickets')}/>
-        {userEmail==='lifegrading@gmail.com'&&<Item icon="👥" label="Admin" onClick={()=>nav('/admin')}/>}
-      </div>
-      <div>
-        <Item icon="⚙️" label="Settings" onClick={()=>nav('/dashboard/settings')}/>
-        <Item icon="🚪" label="Log out" onClick={()=>window.location.href='/api/auth/logout'}/>
-      </div>
-    </aside>
-  );
-}
 
 export default function UpdatesPage() {
   const router = useRouter();

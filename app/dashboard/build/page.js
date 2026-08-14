@@ -127,7 +127,7 @@ export default function BuildPage() {
 
   return (
     <div className="page-enter" style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      <Sidebar userEmail={userEmail} />
+      <Sidebar userEmail={userEmail} router={router} />
       <div style={{ flex: 1, padding: '28px 36px', overflowY: 'auto' }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0' }}>Build Center</h1>
         <p style={{ color: colors.textDim, fontSize: 14, margin: '0 0 24px 0' }}>Build, download, and install your mods.</p>
