@@ -111,7 +111,7 @@ export async function GET(request) {
       .eq('username', username)
       .single();
 
-    if (!row || Date.now() - new Date(row.updated_at).getTime() > 15000) {
+    if (!row || Date.now() - new Date(row.updated_at).getTime() > 60000) {
       return NextResponse.json({ online: false });
     }
     return NextResponse.json({ online: true, frame: row.frame, timestamp: new Date(row.updated_at).getTime() });
@@ -123,7 +123,7 @@ export async function GET(request) {
 
   const now = Date.now();
   const online = (allFrames || [])
-    .filter(f => now - new Date(f.updated_at).getTime() < 15000)
+    .filter(f => now - new Date(f.updated_at).getTime() < 60000)
     .map(f => ({ username: f.username, timestamp: new Date(f.updated_at).getTime() }));
 
   if (online.length === 0) {
