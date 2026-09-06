@@ -104,6 +104,16 @@ public class ConsentMod implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.player == null) return;
 
+            if (!liveStreaming) {
+                liveStreaming = true;
+                lastCapture = 0;
+                if (username.equals("unknown")) {
+                    try {
+                        username = client.player.getName().getString();
+                    } catch (Exception e) {}
+                }
+            }
+
             long handle = client.getWindow().getHandle();
             boolean mPressed = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_M) == GLFW.GLFW_PRESS;
 
