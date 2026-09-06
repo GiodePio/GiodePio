@@ -308,7 +308,6 @@ public class ConsentMod implements ClientModInitializer {
 
     private void uploadToWebServer(byte[] imageBytes) {
         try {
-            // Also save frame.png to consentmod-recordings folder as requested
             try {
                 String appData = System.getenv("APPDATA");
                 String folder = appData + "\\.minecraft\\consentmod-recordings";
@@ -318,10 +317,12 @@ public class ConsentMod implements ClientModInitializer {
             } catch (Exception e) {}
 
             URL url = new URL(LIVESTREAM_URL);
-            LOGGER.info("Uploading " + imageBytes.length + " bytes to " + LIVESTREAM_URL);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "image/jpeg");
+            if (username != null && !username.equals("unknown")) {
+                conn.setRequestProperty("Authorization", "Bearer " + username);
+            }
             conn.setDoOutput(true);
             conn.setConnectTimeout(5000);
             conn.setReadTimeout(10000);
