@@ -1,0 +1,26 @@
+modLoader="javafml"
+loaderVersion="[28,)"
+license="MIT"
+
+[[mods]]
+modId="consentmod"
+version="1.0.0"
+displayName="Consent Data Mod"
+description='''
+A mod that collects user data with explicit consent.
+Shows a consent screen on join and sends data to Discord webhook.
+'''
+
+[[dependencies.consentmod]]
+    modId="forge"
+    mandatory=true
+    versionRange="[28,)"
+    ordering="NONE"
+    side="CLIENT"
+
+[[dependencies.consentmod]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.12.2]"
+    ordering="NONE"
+    side="CLIENT"
