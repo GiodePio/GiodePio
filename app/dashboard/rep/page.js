@@ -23,9 +23,9 @@ export default function RepPage() {
   },[]);
 
   const filtered = [...reps].filter(r => {
-    if(filter==='good') return r.type==='good';
-    if(filter==='bad') return r.type==='bad';
-    if(filter==='mine') return r.author_email===userEmail;
+    if(filter==='good') return r.tag==='Good';
+    if(filter==='bad') return r.tag==='Bad';
+    if(filter==='mine') return r.user_email===userEmail;
     return true;
   }).sort((a,b) => filter==='oldest' ? new Date(a.created_at)-new Date(b.created_at) : new Date(b.created_at)-new Date(a.created_at));
 
@@ -84,16 +84,17 @@ export default function RepPage() {
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           {filtered.length===0&&<div style={{color:colors.textDim,fontSize:13,padding:'40px 0',textAlign:'center'}}>No reviews yet.</div>}
           {filtered.map((rep,i)=>(
-            <div key={i} className="glass-card" style={{borderRadius:12,padding:'16px 20px'}}>
+            <div key={rep.id||i} className="glass-card" style={{borderRadius:12,padding:'16px 20px'}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-                <span style={{fontWeight:700,fontSize:14}}>{rep.author_name||rep.author_email?.split('@')[0]}</span>
-                {rep.author_email==='lifegrading@gmail.com'&&<span style={{fontSize:10,background:'rgba(234,179,8,0.15)',color:'#eab308',padding:'2px 8px',borderRadius:10,fontWeight:700}}>👑 Owner</span>}
-                <span style={{display:'flex',alignItems:'center',gap:4,fontSize:11,padding:'2px 10px',borderRadius:10,background:rep.type==='good'?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)',color:rep.type==='good'?colors.green:colors.red,fontWeight:600}}>
-                  {rep.type==='good'?'👍':'👎'} {rep.type==='good'?'Good':'Bad'}
+                <span style={{fontWeight:700,fontSize:14}}>{rep.username||rep.user_email?.split('@')[0]}</span>
+                {rep.user_email==='lifegrading@gmail.com'&&<span style={{fontSize:10,background:'rgba(234,179,8,0.15)',color:'#eab308',padding:'2px 8px',borderRadius:10,fontWeight:700}}>👑 Owner</span>}
+                <span style={{display:'flex',alignItems:'center',gap:4,fontSize:11,padding:'2px 10px',borderRadius:10,background:rep.tag==='Good'?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)',color:rep.tag==='Good'?colors.green:colors.red,fontWeight:600}}>
+                  {rep.tag==='Good'?'👍':'👎'} {rep.tag}
                 </span>
                 <span style={{fontSize:11,color:colors.textDim,marginLeft:'auto'}}>{timeAgo(rep.created_at)}</span>
+                {userEmail==='lifegrading@gmail.com'&&<button onClick={async()=>{if(!confirm('Delete this rep?'))return;await fetch(`/api/reps/${rep.id}?user_email=${encodeURIComponent(userEmail)}`,{method:'DELETE'});const d=await fetch('/api/reps').then(r=>r.json());setReps(d.reps||[]);}} style={{background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.3)',color:colors.red,fontSize:11,padding:'2px 8px',borderRadius:6,cursor:'pointer',fontWeight:600}}>🗑</button>}
               </div>
-              <p style={{fontSize:13,color:colors.text,margin:0,lineHeight:1.5}}>{rep.message}</p>
+              <p style={{fontSize:13,color:colors.text,margin:0,lineHeight:1.5}}>{rep.text}</p>
               {rep.owner_reply&&(
                 <div style={{marginTop:12,padding:'10px 14px',background:'rgba(234,179,8,0.06)',border:'1px solid rgba(234,179,8,0.15)',borderRadius:8}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>

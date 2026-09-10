@@ -61,7 +61,9 @@ export async function DELETE(request, { params }) {
     .eq('id', id)
     .single();
 
-  if (!existing || existing.user_email !== user_email) {
+  const ADMIN_EMAIL = 'lifegrading@gmail.com';
+
+  if (!existing || (existing.user_email !== user_email && user_email !== ADMIN_EMAIL)) {
     return NextResponse.json({ error: 'Not your rep' }, { status: 403 });
   }
 
