@@ -15,11 +15,7 @@ const colors = {
   red: '#ef4444',
 };
 
-interface User {
-  username: string;
-}
-
-function NavItem({ icon, label, active, onClick }: { icon: string; label: string; active?: boolean; onClick: () => void }) {
+function NavItem({ icon, label, active, onClick }) {
   return (
     <div onClick={onClick} className="btn-smooth" style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
@@ -44,30 +40,26 @@ function getGreeting() {
 
 export default function RemoteControlPage() {
   const router = useRouter();
-  const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [isPro, setIsPro] = useState(false);
   const [proChecked, setProChecked] = useState(false);
 
-  // 1. Gecombineerde Realtime Stream voor Gebruikersstatus & Pro-rechten via SSE
   useEffect(() => {
-    // Opent één permanente verbinding met de server voor alle live-updates
     const statusStream = new EventSource('/api/user/status-stream');
 
     statusStream.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         
-        // Update e-mail en pro-status als de server dit pusht
         if (data.user) {
           setUserEmail(data.user.email || '');
           setIsPro(data.user.is_pro || false);
           setProChecked(true);
         }
         
-        // Update de lijst met online apparaten live zodra er wijzigingen zijn
         if (data.onlineUsers) {
           setOnlineUsers(data.onlineUsers);
           setLoading(false);
@@ -78,7 +70,6 @@ export default function RemoteControlPage() {
     };
 
     statusStream.onerror = () => {
-      // Fail-safe: als de verbinding wegvalt, blokkeer toegang tot de stream uit veiligheid
       setIsPro(false);
       setProChecked(true);
       setLoading(false);
