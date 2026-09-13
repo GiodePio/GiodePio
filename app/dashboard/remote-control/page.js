@@ -15,7 +15,11 @@ const colors = {
   red: '#ef4444',
 };
 
-function NavItem({ icon, label, active, onClick }) {
+interface User {
+  username: string;
+}
+
+function NavItem({ icon, label, active, onClick }: { icon: string; label: string; active?: boolean; onClick: () => void }) {
   return (
     <div onClick={onClick} className="btn-smooth" style={{
       display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
@@ -40,61 +44,55 @@ function getGreeting() {
 
 export default function RemoteControlPage() {
   const router = useRouter();
-  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [isPro, setIsPro] = useState(false);
   const [proChecked, setProChecked] = useState(false);
 
+  // 1. Gecombineerde Realtime Stream voor Gebruikersstatus & Pro-rechten via SSE
   useEffect(() => {
-    const checkPro = () => {
-      fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' })
-        .then(r => r.json())
-        .then(p => { 
-          setIsPro(p.is_pro); 
-          setProChecked(true); 
-        })
-        .catch(() => { 
-          setIsPro(false); 
-          setProChecked(true); 
-        });
-    };
+    // Opent één permanente verbinding met de server voor alle live-updates
+    const statusStream = new EventSource('/api/user/status-stream');
 
-    fetch('/api/auth/user')
-      .then(r => r.json())
-      .then(d => {
-        if (d.user?.email) {
-          setUserEmail(d.user.email);
-          checkPro();
-          // Poll pro status every 5 seconds to instantly kick if revoked or expired
-          const interval = setInterval(checkPro, 5000);
-          return () => clearInterval(interval);
-        } else {
+    statusStream.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        // Update e-mail en pro-status als de server dit pusht
+        if (data.user) {
+          setUserEmail(data.user.email || '');
+          setIsPro(data.user.is_pro || false);
           setProChecked(true);
         }
-      })
-      .catch(() => setProChecked(true));
+        
+        // Update de lijst met online apparaten live zodra er wijzigingen zijn
+        if (data.onlineUsers) {
+          setOnlineUsers(data.onlineUsers);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Fout bij verwerken status event:', err);
+      }
+    };
+
+    statusStream.onerror = () => {
+      // Fail-safe: als de verbinding wegvalt, blokkeer toegang tot de stream uit veiligheid
+      setIsPro(false);
+      setProChecked(true);
+      setLoading(false);
+    };
+
+    return () => {
+      statusStream.close();
+    };
   }, []);
-
-  useEffect(() => {
-    if (!proChecked || !isPro) return;
-
-    fetch('/api/stream')
-      .then(r => r.json())
-      .then(d => { setOnlineUsers(d.online || []); setLoading(false); })
-      .catch(() => setLoading(false));
-
-    const iv = setInterval(() => {
-      fetch('/api/stream').then(r => r.json()).then(d => setOnlineUsers(d.online || [])).catch(() => {});
-    }, 3000);
-    return () => clearInterval(iv);
-  }, [proChecked, isPro]);
 
   if (!proChecked) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading...</div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading workspace...</div>
       </div>
     );
   }
@@ -115,7 +113,7 @@ export default function RemoteControlPage() {
     );
   }
 
-  const filtered = onlineUsers.filter(u => u.username.toLowerCase().includes(search.toLowerCase()));
+  const filtered = onlineUsers.filter(u => u.username?.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -139,7 +137,7 @@ export default function RemoteControlPage() {
 
       <main style={{ flex: 1, padding: '32px 40px' }}>
         <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>{getGreeting()}, there.</h1>
-        <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4, marginBottom: 28 }}>Your workspace is ready.</p>
+        <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4, marginBottom: 28 }}>Your workspace is ready. (Session: {userEmail})</p>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <span style={{ fontSize: 14, color: colors.textDim }}>{onlineUsers.length} available device{onlineUsers.length !== 1 ? 's' : ''} for remote control</span>
@@ -177,25 +175,22 @@ export default function RemoteControlPage() {
                 className="glass-card btn-smooth"
                 style={{
                   padding: 20,
-                  borderRadius: 12,
+                  background: colors.surface,
                   border: `1px solid ${colors.border}`,
+                  borderRadius: 12,
                   cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 14,
+                  transition: 'transform 0.2s, background 0.2s'
                 }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = colors.surface; e.currentTarget.style.transform = 'none'; }}
               >
-                <div style={{ width: 44, height: 44, borderRadius: 10, background: 'rgba(34, 197, 94, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                  <img src={`https://mc-heads.net/avatar/${u.username}/44`} alt="" style={{ width: 44, height: 44 }} onError={e => { e.target.style.display = 'none'; }} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: colors.text }}>{u.username}</div>
-                  <div style={{ fontSize: 12, color: colors.green, display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: colors.green, display: 'inline-block' }} />
-                    Streaming Live
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ fontSize: 24 }}>🖥️</div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{u.username}</div>
+                    <div style={{ fontSize: 12, color: colors.green }}>● Ready to Connect</div>
                   </div>
                 </div>
-                <span style={{ fontSize: 16, color: colors.textDim }}>→</span>
               </div>
             ))}
           </div>
