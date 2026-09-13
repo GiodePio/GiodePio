@@ -1,119 +1,192 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function LivestreamPage() {
-  const [status, setStatus] = useState('Connecting...');
-  const [statusColor, setStatusColor] = useState('#fa0');
-  const [chatMessages, setChatMessages] = useState([]);
-  const [chatInput, setChatInput] = useState('');
-  const [lastUpdate, setLastUpdate] = useState('');
-  const chatLogRef = useRef(null);
+const colors = {
+  bg: '#050508',
+  panel: 'rgba(13, 13, 18, 0.7)',
+  surface: 'rgba(10, 10, 16, 0.8)',
+  border: 'rgba(255,255,255,0.06)',
+  text: '#f0f0f0',
+  textDim: '#6b6e7b',
+  green: '#22c55e',
+  blue: '#3b82f6',
+  red: '#ef4444',
+};
 
-  // Automatisch naar beneden scrollen bij nieuwe chatberichten
+function NavItem({ icon, label, active, onClick }) {
+  return (
+    <div onClick={onClick} className="btn-smooth" style={{
+      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
+      background: active ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
+      color: active ? colors.green : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
+    }}
+    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = colors.text; } }}
+    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = colors.textDim; } }}
+    >
+      <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{icon}</span>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+export default function RemoteControlPage() {
+  const router = useRouter();
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [isPro, setIsPro] = useState(false);
+  const [proChecked, setProChecked] = useState(false);
+
   useEffect(() => {
-    if (chatLogRef.current) {
-      chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight;
-    }
-  }, [chatMessages]);
+    const statusStream = new EventSource('/api/user/status-stream');
 
-  // Realtime Chat via Server-Sent Events (SSE)
-  useEffect(() => {
-    const eventSource = new EventSource('/api/chat/stream');
-
-    eventSource.onmessage = (event) => {
+    statusStream.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.msg) {
-          setChatMessages((prev) => [...prev, { from: data.from || 'Player', text: data.msg }]);
-          setLastUpdate(new Date().toLocaleTimeString());
+        
+        if (data.user) {
+          setUserEmail(data.user.email || '');
+          setIsPro(data.user.is_pro || false);
+          setProChecked(true);
+        }
+        
+        if (data.onlineUsers) {
+          setOnlineUsers(data.onlineUsers);
+          setLoading(false);
         }
       } catch (err) {
-        console.error('Fout bij verwerken chat event:', err);
+        console.error('Fout bij verwerken status event:', err);
       }
     };
 
-    eventSource.onerror = () => {
-      setStatus('Chat connection lost. Reconnecting...');
-      setStatusColor('#f00');
+    statusStream.onerror = () => {
+      setIsPro(false);
+      setProChecked(true);
+      setLoading(false);
     };
 
     return () => {
-      eventSource.close();
+      statusStream.close();
     };
   }, []);
 
-  const handleStreamLoad = () => {
-    setStatus('Connected');
-    setStatusColor('#0f0');
-    setLastUpdate(new Date().toLocaleTimeString());
-  };
+  if (!proChecked) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading workspace...</div>
+      </div>
+    );
+  }
 
-  const handleStreamError = () => {
-    setStatus('Waiting for stream...');
-    setStatusColor('#fa0');
-  };
-
-  const sendChat = async () => {
-    const msg = chatInput.trim();
-    if (!msg) return;
-
-    setChatMessages((prev) => [...prev, { from: 'You', text: msg }]);
-    setChatInput('');
-
-    try {
-      await fetch('/api/chat/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ msg }),
-      });
-    } catch (err) {
-      console.error('Fout bij verzenden bericht:', err);
-    }
-  };
-
-  return (
-    <div style={{ margin: 0, padding: 20, background: '#1a1a1a', color: 'white', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '100vh' }}>
-      <h1 style={{ marginBottom: 10 }}>Live Stream</h1>
-      <div style={{ color: statusColor, marginBottom: 10, fontWeight: 'bold' }}>{status}</div>
-      
-      <img
-        src="/api/stream"
-        alt="Livestream feed"
-        onLoad={handleStreamLoad}
-        onError={handleStreamError}
-        style={{ maxWidth: '90vw', maxHeight: '70vh', border: '2px solid #333', borderRadius: '4px', backgroundColor: '#000' }}
-      />
-      
-      <div style={{ color: '#888', marginTop: 10, fontSize: 12 }}>Last update: {lastUpdate}</div>
-      
-      <div style={{ marginTop: 20, width: '90vw', maxWidth: 600 }}>
-        <div style={{ display: 'flex', gap: 0 }}>
-          <input
-            type="text"
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendChat()}
-            placeholder="Type a message..."
-            maxLength={100}
-            style={{ flex: 1, padding: 10, border: '1px solid #333', background: '#222', color: 'white', borderRadius: '5px 0 0 5px', fontSize: 16 }}
-          />
-          <button
-            onClick={sendChat}
-            style={{ padding: '10px 20px', background: '#5865F2', color: 'white', border: 'none', borderRadius: '0 5px 5px 0', fontSize: 16, cursor: 'pointer', fontWeight: 'bold' }}
-          >
-            Send
-          </button>
-        </div>
-        
-        <div ref={chatLogRef} style={{ marginTop: 10, textAlign: 'left', maxHeight: 200, overflowY: 'auto', border: '1px solid #2a2a2a', padding: '5px', borderRadius: '4px' }}>
-          {chatMessages.map((m, i) => (
-            <div key={i} style={{ padding: '5px 10px', margin: '4px 0', background: '#222', borderRadius: 3, fontSize: 14 }}>
-              <span style={{ color: m.from === 'You' ? '#43b581' : '#5865F2', fontWeight: 'bold' }}>{m.from}:</span> {m.text}
-            </div>
-          ))}
+  if (!isPro) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
+          <div style={{ fontSize: 48 }}>🔒</div>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>Pro Required</div>
+          <div style={{ fontSize: 14, color: colors.textDim, textAlign: 'center', maxWidth: 400 }}>
+            Remote Control is only available for Pro users. Free trials cannot access this feature.
+          </div>
+          <button onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>Upgrade to Pro</button>
+          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
         </div>
       </div>
+    );
+  }
+
+  const filtered = onlineUsers.filter(u => u.username?.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+      <aside style={{ width: 220, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column', background: colors.surface }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
+          <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
+        </div>
+        <div style={{ flex: 1 }}>
+          <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
+          <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
+          <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
+          <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
+          <NavItem icon="🖥" label="Remote Control" active onClick={() => router.push('/dashboard/remote-control')} />
+          <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
+        </div>
+        <div>
+          <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
+        </div>
+      </aside>
+
+      <main style={{ flex: 1, padding: '32px 40px' }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>{getGreeting()}, there.</h1>
+        <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4, marginBottom: 28 }}>Your workspace is ready. (Session: {userEmail})</p>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <span style={{ fontSize: 14, color: colors.textDim }}>{onlineUsers.length} available device{onlineUsers.length !== 1 ? 's' : ''} for remote control</span>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: colors.textDim, fontSize: 14 }}>🔍</span>
+            <input
+              type="text"
+              placeholder="Search..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: `1px solid ${colors.border}`,
+                borderRadius: 8,
+                padding: '8px 14px 8px 36px',
+                color: colors.text,
+                fontSize: 13,
+                outline: 'none',
+                width: 220,
+              }}
+            />
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '60px', color: colors.textDim, fontSize: 13 }}>Loading active streams...</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px', color: colors.textDim, fontSize: 13 }}>No active streams found. Make sure mod users are online.</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
+            {filtered.map(u => (
+              <div
+                key={u.username}
+                onClick={() => router.push(`/dashboard/remote-control/${encodeURIComponent(u.username)}`)}
+                className="glass-card btn-smooth"
+                style={{
+                  padding: 20,
+                  background: colors.surface,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 12,
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s, background 0.2s'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = colors.surface; e.currentTarget.style.transform = 'none'; }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ fontSize: 24 }}>🖥️</div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{u.username}</div>
+                    <div style={{ fontSize: 12, color: colors.green }}>● Ready to Connect</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
     </div>
   );
 }
