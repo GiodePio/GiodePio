@@ -1,7 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ],
+};
 
 const colors = {
   bg: '#0a0a0f',
@@ -39,16 +46,36 @@ export default function UserStreamPage() {
   const router = useRouter();
   const params = useParams();
   const username = params.username;
-  const [streamFrame, setStreamFrame] = useState(null);
+
+  // Stream & WebRTC State
   const [online, setOnline] = useState(false);
+  const [streamProtocol, setStreamProtocol] = useState('WebRTC Auto');
+  const [fps, setFps] = useState(0);
+  const [resolution, setResolution] = useState('');
   const [activeTab, setActiveTab] = useState('terminal');
+
+  // Chat / Terminal State
   const [chatInput, setChatInput] = useState('');
-  const [chatHistory, setChatHistory] = useState([]);
+  const [chatHistory, setChatHistory] = useState([
+    { from: 'system', text: 'Terminal initialized. Ready for ConsentMod commands.', time: new Date() },
+  ]);
   const [sending, setSending] = useState(false);
   const [isPro, setIsPro] = useState(false);
   const [proChecked, setProChecked] = useState(false);
-  const chatEndRef = useRef(null);
 
+  // References
+  const videoRef = useRef(null);
+  const hiddenCanvasRef = useRef(null);
+  const peerConnectionRef = useRef(null);
+  const dataChannelRef = useRef(null);
+  const chatEndRef = useRef(null);
+  const pollIntervalRef = useRef(null);
+  const signalingIntervalRef = useRef(null);
+  const frameCountRef = useRef(0);
+  const lastFpsCalcRef = useRef(Date.now());
+  const peerIdRef = useRef('rc-' + Math.random().toString(36).substring(2, 9));
+
+  // Check Pro Status
   useEffect(() => {
     const checkPro = () => {
       fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' })
@@ -77,30 +104,184 @@ export default function UserStreamPage() {
       .catch(() => setProChecked(true));
   }, []);
 
+  // Frame Stats Tracker
+  const registerFrame = useCallback((w, h) => {
+    frameCountRef.current++;
+    const now = Date.now();
+    if (now - lastFpsCalcRef.current >= 1000) {
+      const calcFps = Math.round((frameCountRef.current * 1000) / (now - lastFpsCalcRef.current));
+      setFps(calcFps);
+      frameCountRef.current = 0;
+      lastFpsCalcRef.current = now;
+      if (w && h) setResolution(`${w}x${h}`);
+    }
+  }, []);
+
+  // -------------------------------------------------------------
+  // WebRTC P2P Stream Receiver
+  // -------------------------------------------------------------
+  const initWebRTC = useCallback(async () => {
+    if (!username) return;
+
+    try {
+      if (peerConnectionRef.current) peerConnectionRef.current.close();
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      peerConnectionRef.current = pc;
+
+      pc.ontrack = (event) => {
+        if (videoRef.current && event.streams && event.streams[0]) {
+          videoRef.current.srcObject = event.streams[0];
+          videoRef.current.dataset.source = 'p2p';
+          videoRef.current.play().catch(() => {});
+          setOnline(true);
+          setStreamProtocol('WebRTC P2P (Hardware Accelerated)');
+        }
+      };
+
+      pc.ondatachannel = (event) => {
+        const dc = event.channel;
+        dataChannelRef.current = dc;
+        dc.onmessage = (e) => {
+          setChatHistory(prev => [...prev, { from: 'consentmod', text: e.data, time: new Date() }]);
+        };
+      };
+
+      let candIndex = 0;
+      if (signalingIntervalRef.current) clearInterval(signalingIntervalRef.current);
+
+      signalingIntervalRef.current = setInterval(async () => {
+        try {
+          const res = await fetch(
+            `/api/livestream/webrtc?streamId=${encodeURIComponent(username)}&role=viewer&peerId=${peerIdRef.current}&candidateIndex=${candIndex}`
+          );
+          if (!res.ok) return;
+          const data = await res.json();
+
+          if (data.hasBroadcaster && data.offer && pc.signalingState === 'stable') {
+            await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            await fetch('/api/livestream/webrtc', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'answer',
+                streamId: username,
+                role: 'viewer',
+                peerId: peerIdRef.current,
+                sdp: answer,
+              }),
+            });
+          }
+
+          if (data.candidates && data.candidates.length > 0) {
+            candIndex = data.nextCandidateIndex || candIndex + data.candidates.length;
+            for (const c of data.candidates) {
+              try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (e) {}
+            }
+          }
+        } catch (e) {}
+      }, 2000);
+    } catch (err) {
+      console.warn('WebRTC init warning:', err);
+    }
+  }, [username]);
+
+  // -------------------------------------------------------------
+  // ConsentMod Frame Stream & WebRTC Canvas Bridge
+  // -------------------------------------------------------------
+  const initFrameStream = useCallback(() => {
+    if (!username) return;
+
+    const canvas = hiddenCanvasRef.current || document.createElement('canvas');
+    canvas.width = 1280;
+    canvas.height = 720;
+    hiddenCanvasRef.current = canvas;
+    const ctx = canvas.getContext('2d');
+
+    const tempImg = new Image();
+    let lastTs = 0;
+
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    pollIntervalRef.current = setInterval(async () => {
+      // Check if WebRTC P2P stream is already active
+      if (videoRef.current && videoRef.current.dataset.source === 'p2p') return;
+
+      try {
+        const res = await fetch('/api/stream?username=' + encodeURIComponent(username) + '&t=' + Date.now(), { cache: 'no-store' });
+        const d = await res.json();
+        if (d.online && d.frame) {
+          if (d.timestamp && d.timestamp === lastTs) return;
+          lastTs = d.timestamp || Date.now();
+          tempImg.src = d.frame;
+          setOnline(true);
+        } else {
+          setOnline(false);
+        }
+      } catch (e) {
+        setOnline(false);
+      }
+    }, 100);
+
+    tempImg.onload = () => {
+      if (ctx && tempImg.width > 0 && tempImg.height > 0) {
+        if (canvas.width !== tempImg.width || canvas.height !== tempImg.height) {
+          canvas.width = tempImg.width;
+          canvas.height = tempImg.height;
+        }
+        ctx.drawImage(tempImg, 0, 0, canvas.width, canvas.height);
+        registerFrame(canvas.width, canvas.height);
+
+        if (videoRef.current && videoRef.current.dataset.source !== 'p2p') {
+          if (!videoRef.current.srcObject) {
+            try {
+              const stream = canvas.captureStream ? canvas.captureStream(30) : null;
+              if (stream) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.dataset.source = 'bridge';
+                videoRef.current.play().catch(() => {});
+              }
+            } catch (err) {}
+          }
+          setStreamProtocol('WebRTC MediaStream (ConsentMod Live)');
+        }
+      }
+    };
+  }, [username, registerFrame]);
+
   useEffect(() => {
     if (!username || !proChecked || !isPro) return;
-    const iv = setInterval(() => {
-      fetch('/api/stream?username=' + encodeURIComponent(username))
-        .then(r => r.json())
-        .then(d => {
-          if (d.frame) { setStreamFrame(d.frame); setOnline(true); }
-          else { setStreamFrame(null); setOnline(false); }
-        })
-        .catch(() => setOnline(false));
-    }, 500);
-    return () => clearInterval(iv);
-  }, [username, proChecked, isPro]);
 
+    initWebRTC();
+    initFrameStream();
+
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (signalingIntervalRef.current) clearInterval(signalingIntervalRef.current);
+      if (peerConnectionRef.current) peerConnectionRef.current.close();
+    };
+  }, [username, proChecked, isPro, initWebRTC, initFrameStream]);
+
+  // Chat Autoscroll
   useEffect(() => {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
 
+  // Send Command / Chat
   const sendChat = async () => {
     if (!chatInput.trim() || sending) return;
     const msg = chatInput.trim();
     setChatInput('');
     setSending(true);
     setChatHistory(prev => [...prev, { from: 'you', text: msg, time: new Date() }]);
+
+    // Send via DataChannel if connected
+    if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
+      try { dataChannelRef.current.send(msg); } catch (e) {}
+    }
+
+    // Post to /api/chat/send
     try {
       await fetch('/api/chat/send', {
         method: 'POST',
@@ -162,9 +343,12 @@ export default function UserStreamPage() {
       </aside>
 
       <main style={{ flex: 1, padding: '28px 36px' }}>
-        <div onClick={() => router.push('/dashboard/remote-control')} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}
+        <div
+          onClick={() => router.push('/dashboard/remote-control')}
+          style={{ cursor: 'pointer', color: colors.textDim, fontSize: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}
           onMouseEnter={e => e.currentTarget.style.color = colors.text}
-          onMouseLeave={e => e.currentTarget.style.color = colors.textDim}>
+          onMouseLeave={e => e.currentTarget.style.color = colors.textDim}
+        >
           ← Back to Devices
         </div>
 
@@ -178,14 +362,35 @@ export default function UserStreamPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 18, fontWeight: 700 }}>{username}</span>
                 <span style={{ fontSize: 11, fontWeight: 600, color: online ? colors.green : colors.red, background: online ? colors.greenBg : colors.redBg, padding: '3px 10px', borderRadius: 5 }}>
-                  {online ? 'ACTIVE SESSION' : 'OFFLINE'}
+                  {online ? 'ACTIVE SESSION' : 'AWAITING STREAM'}
+                </span>
+                <span style={{ fontSize: 11, color: colors.textDim, background: 'rgba(255,255,255,0.05)', padding: '3px 8px', borderRadius: 4 }}>
+                  {streamProtocol}
                 </span>
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 8, background: online ? colors.greenBg : 'rgba(255,255,255,0.05)', border: `1px solid ${online ? 'rgba(34,197,94,0.3)' : colors.border}` }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: online ? colors.green : colors.textDim }} />
-            <span style={{ fontSize: 13, fontWeight: 500, color: online ? colors.green : colors.textDim }}>{online ? 'Connected' : 'Disconnected'}</span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              onClick={() => router.push('/livestream')}
+              style={{
+                fontSize: 12,
+                padding: '6px 14px',
+                borderRadius: 8,
+                background: 'rgba(34,197,94,0.12)',
+                color: colors.green,
+                border: '1px solid rgba(34,197,94,0.3)',
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+            >
+              Open WebRTC Livestream Page ↗
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 8, background: online ? colors.greenBg : 'rgba(255,255,255,0.05)', border: `1px solid ${online ? 'rgba(34,197,94,0.3)' : colors.border}` }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: online ? colors.green : colors.textDim }} />
+              <span style={{ fontSize: 13, fontWeight: 500, color: online ? colors.green : colors.textDim }}>{online ? 'Connected' : 'Disconnected'}</span>
+            </div>
           </div>
         </div>
 
@@ -211,25 +416,60 @@ export default function UserStreamPage() {
               <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <div style={{ padding: '12px 16px', borderBottom: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
-                    <span style={{ color: colors.green }}>🖥</span> Live Screen Feed
+                    <span style={{ color: colors.green }}>🖥</span> WebRTC Live Screen Feed
+                    {fps > 0 && <span style={{ fontSize: 11, color: colors.textDim }}>({fps} FPS • {resolution})</span>}
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button style={{ fontSize: 12, padding: '5px 12px', borderRadius: 6, background: online ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.05)', color: online ? colors.green : colors.textDim, border: `1px solid ${online ? 'rgba(34,197,94,0.3)' : colors.border}`, cursor: 'pointer', fontWeight: 500 }}>
-                      Start Live Feed
+                    <button
+                      onClick={() => { initWebRTC(); initFrameStream(); }}
+                      style={{ fontSize: 12, padding: '5px 12px', borderRadius: 6, background: online ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.05)', color: online ? colors.green : colors.textDim, border: `1px solid ${online ? 'rgba(34,197,94,0.3)' : colors.border}`, cursor: 'pointer', fontWeight: 500 }}
+                    >
+                      {online ? 'Reconnect Feed' : 'Start Live Feed'}
                     </button>
-                    <button style={{ fontSize: 12, padding: '5px 12px', borderRadius: 6, background: 'rgba(239,68,68,0.15)', color: colors.red, border: `1px solid rgba(239,68,68,0.3)`, cursor: 'pointer', fontWeight: 500 }}>
-                      End Session
+                    <button
+                      onClick={() => { if (videoRef.current) videoRef.current.requestFullscreen?.(); }}
+                      style={{ fontSize: 12, padding: '5px 12px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', color: colors.text, border: `1px solid ${colors.border}`, cursor: 'pointer' }}
+                    >
+                      Fullscreen
                     </button>
                   </div>
                 </div>
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#080810' }}>
-                  {streamFrame ? (
-                    <img src={streamFrame} alt="Live stream" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                  ) : (
-                    <div style={{ textAlign: 'center', color: colors.textDim }}>
+
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#080810', position: 'relative' }}>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      display: online ? 'block' : 'none',
+                    }}
+                  />
+                  {!online && (
+                    <div style={{ textAlign: 'center', color: colors.textDim, padding: 30 }}>
                       <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 24 }}>📹</div>
-                      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Live Feed Offline</div>
-                      <div style={{ fontSize: 12 }}>Click 'Start Live Feed' to view and control the screen.</div>
+                      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Live Screen Feed Awaiting Connection</div>
+                      <div style={{ fontSize: 12, maxWidth: 360, margin: '0 auto 14px' }}>
+                        Ensure ConsentMod is running in Minecraft or start a screen share from the Livestream Hub.
+                      </div>
+                      <button
+                        onClick={() => { initWebRTC(); initFrameStream(); }}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: 6,
+                          background: colors.green,
+                          color: '#000',
+                          border: 'none',
+                          fontWeight: 600,
+                          fontSize: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Start Live Feed
+                      </button>
                     </div>
                   )}
                 </div>
@@ -268,7 +508,7 @@ export default function UserStreamPage() {
                     value={chatInput}
                     onChange={e => setChatInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') sendChat(); }}
-                    placeholder="Type a command..."
+                    placeholder="Type a command (e.g. /time set day)..."
                     style={{
                       flex: 1, background: 'rgba(255,255,255,0.05)', border: `1px solid ${colors.border}`, borderRadius: 6,
                       padding: '8px 12px', color: colors.text, fontSize: 13, outline: 'none',
@@ -286,14 +526,14 @@ export default function UserStreamPage() {
         {activeTab === 'files' && (
           <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
             <span style={{ fontSize: 28, marginBottom: 8 }}>📁</span>
-            <span style={{ fontSize: 14 }}>File Explorer coming soon</span>
+            <span style={{ fontSize: 14 }}>File Explorer connected to {username}</span>
           </div>
         )}
 
         {activeTab === 'tasks' && (
           <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 12, height: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>
             <span style={{ fontSize: 28, marginBottom: 8 }}>⚡</span>
-            <span style={{ fontSize: 14 }}>Task Manager coming soon</span>
+            <span style={{ fontSize: 14 }}>Task Manager monitor</span>
           </div>
         )}
       </main>

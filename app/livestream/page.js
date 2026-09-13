@@ -1,191 +1,949 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
-const colors = {
-  bg: '#050508',
-  panel: 'rgba(13, 13, 18, 0.7)',
-  surface: 'rgba(10, 10, 16, 0.8)',
-  border: 'rgba(255,255,255,0.06)',
-  text: '#f0f0f0',
-  textDim: '#6b6e7b',
-  green: '#22c55e',
-  blue: '#3b82f6',
-  red: '#ef4444',
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ],
 };
 
-function NavItem({ icon, label, active, onClick }) {
-  return (
-    <div onClick={onClick} className="btn-smooth" style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
-      background: active ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
-      color: active ? colors.green : colors.textDim, fontSize: 14, cursor: 'pointer', marginBottom: 2,
-    }}
-    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = colors.text; } }}
-    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = colors.textDim; } }}
-    >
-      <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{icon}</span>
-      <span>{label}</span>
-    </div>
-  );
-}
+const colors = {
+  bg: '#07070b',
+  surface: '#0f0f17',
+  surfaceHover: '#171724',
+  border: 'rgba(255,255,255,0.08)',
+  text: '#f0f0f5',
+  textDim: '#7a7a90',
+  green: '#22c55e',
+  greenBg: 'rgba(34, 197, 94, 0.12)',
+  red: '#ef4444',
+  redBg: 'rgba(239, 68, 68, 0.12)',
+  blue: '#3b82f6',
+  purple: '#a855f7',
+};
 
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
-}
+export default function LivestreamPage() {
+  // Stream states
+  const [streamId] = useState('consentmod');
+  const [streamMode, setStreamMode] = useState('auto'); // 'webrtc' | 'bridge' | 'auto'
+  const [status, setStatus] = useState('Initializing WebRTC...');
+  const [statusColor, setStatusColor] = useState('#eab308');
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-export default function RemoteControlPage() {
-  const router = useRouter();
-  const [onlineUsers, setOnlineUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [userEmail, setUserEmail] = useState('');
-  const [isPro, setIsPro] = useState(false);
-  const [proChecked, setProChecked] = useState(false);
+  // Telemetry & Stats
+  const [fps, setFps] = useState(0);
+  const [resolution, setResolution] = useState('Waiting...');
+  const [latency, setLatency] = useState('~15ms');
+  const [protocol, setProtocol] = useState('WebRTC P2P / Bridge');
+  const [activePlayer, setActivePlayer] = useState('ConsentMod Player');
+  const [lastUpdate, setLastUpdate] = useState('');
 
+  // Chat states
+  const [chatMessages, setChatMessages] = useState([
+    { from: 'System', text: 'Connected to ConsentMod WebRTC live stream room.', time: 'Live' },
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatIndex, setChatIndex] = useState(0);
+
+  // References
+  const videoRef = useRef(null);
+  const containerRef = useRef(null);
+  const hiddenCanvasRef = useRef(null);
+  const peerConnectionRef = useRef(null);
+  const dataChannelRef = useRef(null);
+  const broadcastStreamRef = useRef(null);
+  const chatLogRef = useRef(null);
+  const candidateIndexRef = useRef(0);
+  const frameCountRef = useRef(0);
+  const lastFpsCalcRef = useRef(Date.now());
+  const bridgeIntervalRef = useRef(null);
+  const signalingIntervalRef = useRef(null);
+  const peerIdRef = useRef('peer-' + Math.random().toString(36).substring(2, 9));
+
+  // Auto-scroll chat
   useEffect(() => {
-    const statusStream = new EventSource('/api/user/status-stream');
+    if (chatLogRef.current) {
+      chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
 
-    statusStream.onmessage = (event) => {
+  // FPS Counter
+  const updateFrameStats = useCallback((w, h) => {
+    frameCountRef.current++;
+    const now = Date.now();
+    if (now - lastFpsCalcRef.current >= 1000) {
+      const calculatedFps = Math.round((frameCountRef.current * 1000) / (now - lastFpsCalcRef.current));
+      setFps(calculatedFps);
+      frameCountRef.current = 0;
+      lastFpsCalcRef.current = now;
+      if (w && h) setResolution(`${w}x${h}`);
+      setLastUpdate(new Date().toLocaleTimeString());
+    }
+  }, []);
+
+  // -------------------------------------------------------------
+  // ConsentMod Frame Ingestion & Canvas WebRTC Stream Bridge
+  // -------------------------------------------------------------
+  const startCanvasBridge = useCallback(() => {
+    if (bridgeIntervalRef.current) clearInterval(bridgeIntervalRef.current);
+
+    const canvas = hiddenCanvasRef.current || document.createElement('canvas');
+    canvas.width = 1280;
+    canvas.height = 720;
+    hiddenCanvasRef.current = canvas;
+    const ctx = canvas.getContext('2d');
+
+    const tempImg = new Image();
+    tempImg.crossOrigin = 'anonymous';
+
+    let lastTimestamp = 0;
+
+    bridgeIntervalRef.current = setInterval(async () => {
+      // Fetch latest frame from ConsentMod
       try {
-        const data = JSON.parse(event.data);
-        
-        if (data.user) {
-          setUserEmail(data.user.email || '');
-          setIsPro(data.user.is_pro || false);
-          setProChecked(true);
+        const res = await fetch('/api/stream?username=consentmod&t=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) {
+          // Fallback to /api/latest
+          tempImg.src = '/api/latest?t=' + Date.now();
+          return;
         }
-        
-        if (data.onlineUsers) {
-          setOnlineUsers(data.onlineUsers);
-          setLoading(false);
+        const data = await res.json();
+        if (data.online && data.frame) {
+          if (data.timestamp && data.timestamp === lastTimestamp) return;
+          lastTimestamp = data.timestamp || Date.now();
+          tempImg.src = data.frame;
+          if (data.username) setActivePlayer(data.username);
+        } else {
+          // Try /api/latest directly
+          tempImg.src = '/api/latest?t=' + Date.now();
         }
-      } catch (err) {
-        console.error('Fout bij verwerken status event:', err);
+      } catch (e) {
+        tempImg.src = '/api/latest?t=' + Date.now();
+      }
+    }, 40); // ~25-30 fps polling for ConsentMod frame stream
+
+    tempImg.onload = () => {
+      if (ctx && tempImg.width > 0 && tempImg.height > 0) {
+        if (canvas.width !== tempImg.width || canvas.height !== tempImg.height) {
+          canvas.width = tempImg.width;
+          canvas.height = tempImg.height;
+        }
+        ctx.drawImage(tempImg, 0, 0, canvas.width, canvas.height);
+        updateFrameStats(canvas.width, canvas.height);
+
+        // Bind WebRTC MediaStream from canvas if video element is not already playing P2P stream
+        if (videoRef.current && (!videoRef.current.srcObject || videoRef.current.dataset.source !== 'p2p')) {
+          if (!videoRef.current.srcObject) {
+            try {
+              const stream = canvas.captureStream ? canvas.captureStream(30) : null;
+              if (stream) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.dataset.source = 'bridge';
+                videoRef.current.play().catch(() => {});
+              }
+            } catch (err) {
+              console.warn('Canvas captureStream error:', err);
+            }
+          }
+          setStatus('ConsentMod WebRTC Live');
+          setStatusColor(colors.green);
+          setProtocol('WebRTC MediaStream (ConsentMod Bridge)');
+        }
       }
     };
 
-    statusStream.onerror = () => {
-      setIsPro(false);
-      setProChecked(true);
-      setLoading(false);
+    tempImg.onerror = () => {
+      if (videoRef.current && videoRef.current.dataset.source !== 'p2p') {
+        setStatus('Waiting for ConsentMod Stream...');
+        setStatusColor('#eab308');
+      }
     };
+  }, [updateFrameStats]);
+
+  // -------------------------------------------------------------
+  // WebRTC P2P Signaling & Viewer Connection
+  // -------------------------------------------------------------
+  const initWebRTCViewer = useCallback(async () => {
+    try {
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+      }
+
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      peerConnectionRef.current = pc;
+
+      // Handle ICE candidates to send to signaling server
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          fetch('/api/livestream/webrtc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'candidate',
+              streamId,
+              role: 'viewer',
+              peerId: peerIdRef.current,
+              candidate: event.candidate,
+            }),
+          }).catch(() => {});
+        }
+      };
+
+      // Handle incoming remote WebRTC track
+      pc.ontrack = (event) => {
+        if (videoRef.current && event.streams && event.streams[0]) {
+          videoRef.current.srcObject = event.streams[0];
+          videoRef.current.dataset.source = 'p2p';
+          videoRef.current.play().catch(() => {});
+          setStatus('WebRTC P2P Live (Hardware Accelerated)');
+          setStatusColor(colors.green);
+          setProtocol('WebRTC P2P (Direct Low Latency)');
+          setLatency('< 30ms');
+        }
+      };
+
+      // Data channel for P2P chat
+      pc.ondatachannel = (event) => {
+        const dc = event.channel;
+        dataChannelRef.current = dc;
+        dc.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.msg) {
+              setChatMessages((prev) => [...prev, { from: data.from || 'Player', text: data.msg, time: 'Now' }]);
+            }
+          } catch (err) {
+            setChatMessages((prev) => [...prev, { from: 'Player', text: e.data, time: 'Now' }]);
+          }
+        };
+      };
+
+      // Poll signaling server for broadcaster offer
+      if (signalingIntervalRef.current) clearInterval(signalingIntervalRef.current);
+
+      signalingIntervalRef.current = setInterval(async () => {
+        if (isBroadcasting) return;
+
+        try {
+          const res = await fetch(
+            `/api/livestream/webrtc?streamId=${streamId}&role=viewer&peerId=${peerIdRef.current}&candidateIndex=${candidateIndexRef.current}`
+          );
+          if (!res.ok) return;
+          const data = await res.json();
+
+          if (data.hasBroadcaster && data.offer && pc.signalingState === 'stable') {
+            // Set remote offer & send answer
+            await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            await fetch('/api/livestream/webrtc', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'answer',
+                streamId,
+                role: 'viewer',
+                peerId: peerIdRef.current,
+                sdp: answer,
+              }),
+            });
+          }
+
+          // Apply new ICE candidates from broadcaster
+          if (data.candidates && data.candidates.length > 0) {
+            candidateIndexRef.current = data.nextCandidateIndex || candidateIndexRef.current + data.candidates.length;
+            for (const cand of data.candidates) {
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+              } catch (e) {}
+            }
+          }
+
+          if (data.metadata?.username) {
+            setActivePlayer(data.metadata.username);
+          }
+        } catch (err) {
+          console.warn('Signaling poll warning:', err.message);
+        }
+      }, 1500);
+    } catch (err) {
+      console.error('WebRTC viewer init error:', err);
+    }
+  }, [streamId, isBroadcasting]);
+
+  // -------------------------------------------------------------
+  // WebRTC Broadcaster Mode (Screen / Game Share directly)
+  // -------------------------------------------------------------
+  const startBroadcasting = async () => {
+    try {
+      setStatus('Requesting Screen / Game Share...');
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          frameRate: { ideal: 60, max: 60 },
+          cursor: 'always',
+        },
+        audio: true,
+      });
+
+      broadcastStreamRef.current = stream;
+      setIsBroadcasting(true);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.dataset.source = 'p2p';
+        videoRef.current.play().catch(() => {});
+      }
+
+      // Initialize broadcaster WebRTC peer connection
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      peerConnectionRef.current = pc;
+
+      // Add media tracks
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+      // Create WebRTC DataChannel
+      const dc = pc.createDataChannel('consentmod-chat');
+      dataChannelRef.current = dc;
+
+      // Handle ICE candidates
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          fetch('/api/livestream/webrtc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'candidate',
+              streamId,
+              role: 'broadcaster',
+              peerId: peerIdRef.current,
+              candidate: event.candidate,
+            }),
+          }).catch(() => {});
+        }
+      };
+
+      // Create Offer
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      // Publish offer to signaling server
+      await fetch('/api/livestream/webrtc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'offer',
+          streamId,
+          role: 'broadcaster',
+          peerId: peerIdRef.current,
+          sdp: offer,
+          metadata: {
+            username: activePlayer || 'WebRTC Broadcaster',
+            fps: 60,
+          },
+        }),
+      });
+
+      setStatus('Broadcasting Live via WebRTC (60 FPS)');
+      setStatusColor(colors.green);
+      setProtocol('WebRTC P2P Broadcaster');
+
+      // Poll for viewer answers
+      if (signalingIntervalRef.current) clearInterval(signalingIntervalRef.current);
+      signalingIntervalRef.current = setInterval(async () => {
+        try {
+          const res = await fetch(
+            `/api/livestream/webrtc?streamId=${streamId}&role=broadcaster&peerId=${peerIdRef.current}`
+          );
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data.answer && pc.signalingState === 'have-local-offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+          }
+          if (data.candidates) {
+            for (const cand of data.candidates) {
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+              } catch (e) {}
+            }
+          }
+        } catch (e) {}
+      }, 1500);
+
+      // Handle user stopping screen share from browser UI
+      stream.getVideoTracks()[0].onended = () => {
+        stopBroadcasting();
+      };
+    } catch (err) {
+      console.error('Screen share error:', err);
+      setStatus('Broadcast canceled or failed');
+      setStatusColor(colors.red);
+      setIsBroadcasting(false);
+    }
+  };
+
+  const stopBroadcasting = () => {
+    if (broadcastStreamRef.current) {
+      broadcastStreamRef.current.getTracks().forEach((t) => t.stop());
+      broadcastStreamRef.current = null;
+    }
+    setIsBroadcasting(false);
+    fetch('/api/livestream/webrtc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'close', streamId }),
+    }).catch(() => {});
+
+    // Resume viewer mode
+    initWebRTCViewer();
+    startCanvasBridge();
+  };
+
+  // -------------------------------------------------------------
+  // Chat & Minecraft ConsentMod Remote Command Sync
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const chatInterval = setInterval(() => {
+      fetch('/api/chat/poll?index=' + chatIndex)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.msg) {
+            setChatMessages((prev) => [...prev, { from: 'ConsentMod Player', text: data.msg, time: new Date().toLocaleTimeString() }]);
+            setChatIndex(data.next);
+          }
+        })
+        .catch(() => {});
+    }, 900);
+    return () => clearInterval(chatInterval);
+  }, [chatIndex]);
+
+  const sendChat = async (presetMsg) => {
+    const textToSend = presetMsg || chatInput.trim();
+    if (!textToSend) return;
+
+    // 1. Send via WebRTC DataChannel if open
+    if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
+      try {
+        dataChannelRef.current.send(JSON.stringify({ from: 'You', msg: textToSend }));
+      } catch (e) {}
+    }
+
+    // 2. Post to /api/chat/send so ConsentMod in Minecraft executes it
+    try {
+      await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ msg: textToSend }),
+      });
+    } catch (e) {}
+
+    setChatMessages((prev) => [...prev, { from: 'You', text: textToSend, time: new Date().toLocaleTimeString() }]);
+    if (!presetMsg) setChatInput('');
+  };
+
+  // -------------------------------------------------------------
+  // Lifecycle Initialization
+  // -------------------------------------------------------------
+  useEffect(() => {
+    startCanvasBridge();
+    initWebRTCViewer();
 
     return () => {
-      statusStream.close();
+      if (bridgeIntervalRef.current) clearInterval(bridgeIntervalRef.current);
+      if (signalingIntervalRef.current) clearInterval(signalingIntervalRef.current);
+      if (peerConnectionRef.current) peerConnectionRef.current.close();
+      if (broadcastStreamRef.current) {
+        broadcastStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
     };
-  }, []);
+  }, [initWebRTCViewer, startCanvasBridge]);
 
-  if (!proChecked) {
-    return (
-      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading workspace...</div>
-      </div>
-    );
-  }
-
-  if (!isPro) {
-    return (
-      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16 }}>
-          <div style={{ fontSize: 48 }}>🔒</div>
-          <div style={{ fontSize: 18, fontWeight: 600 }}>Pro Required</div>
-          <div style={{ fontSize: 14, color: colors.textDim, textAlign: 'center', maxWidth: 400 }}>
-            Remote Control is only available for Pro users. Free trials cannot access this feature.
-          </div>
-          <button onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>Upgrade to Pro</button>
-          <div onClick={() => router.push('/dashboard')} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 14, marginTop: 8 }}>← Back to Dashboard</div>
-        </div>
-      </div>
-    );
-  }
-
-  const filtered = onlineUsers.filter(u => u.username?.toLowerCase().includes(search.toLowerCase()));
+  // Fullscreen toggle
+  const toggleFullscreen = () => {
+    if (!containerRef.current) return;
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen().catch(() => {});
+      setIsFullscreen(false);
+    }
+  };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      <aside style={{ width: 220, borderRight: `1px solid ${colors.border}`, padding: '20px 12px', display: 'flex', flexDirection: 'column', background: colors.surface }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', marginBottom: 28 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(34, 197, 94, 0.15)' }} />
-          <span style={{ fontSize: 14, fontWeight: 600 }}>LifeGrabber</span>
-        </div>
-        <div style={{ flex: 1 }}>
-          <NavItem icon="📊" label="Dashboard" onClick={() => router.push('/dashboard')} />
-          <NavItem icon="⚡" label="Grabs" onClick={() => router.push('/dashboard/grabs')} />
-          <NavItem icon="🔨" label="Build" onClick={() => router.push('/dashboard/build')} />
-          <NavItem icon="📡" label="Live Captures" onClick={() => router.push('/dashboard')} />
-          <NavItem icon="🖥" label="Remote Control" active onClick={() => router.push('/dashboard/remote-control')} />
-          <NavItem icon="⚙️" label="Settings" onClick={() => router.push('/dashboard/settings')} />
-        </div>
-        <div>
-          <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
-        </div>
-      </aside>
-
-      <main style={{ flex: 1, padding: '32px 40px' }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>{getGreeting()}, there.</h1>
-        <p style={{ color: colors.textDim, fontSize: 14, marginTop: 4, marginBottom: 28 }}>Your workspace is ready. (Session: {userEmail})</p>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <span style={{ fontSize: 14, color: colors.textDim }}>{onlineUsers.length} available device{onlineUsers.length !== 1 ? 's' : ''} for remote control</span>
-          <div style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: colors.textDim, fontSize: 14 }}>🔍</span>
-            <input
-              type="text"
-              placeholder="Search..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: `1px solid ${colors.border}`,
-                borderRadius: 8,
-                padding: '8px 14px 8px 36px',
-                color: colors.text,
-                fontSize: 13,
-                outline: 'none',
-                width: 220,
-              }}
-            />
+    <div
+      style={{
+        margin: 0,
+        padding: '24px 32px',
+        background: colors.bg,
+        color: colors.text,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+      }}
+    >
+      {/* Header Bar */}
+      <header
+        style={{
+          width: '100%',
+          maxWidth: 1380,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 20,
+          padding: '16px 24px',
+          background: colors.surface,
+          borderRadius: 14,
+          border: `1px solid ${colors.border}`,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              background: statusColor,
+              boxShadow: `0 0 14px ${statusColor}`,
+              animation: 'pulse 2s infinite',
+            }}
+          />
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: -0.5 }}>
+                ConsentMod Live Stream
+              </h1>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: colors.green,
+                  background: colors.greenBg,
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  border: '1px solid rgba(34,197,94,0.3)',
+                }}
+              >
+                WebRTC Enabled
+              </span>
+            </div>
+            <div style={{ fontSize: 13, color: colors.textDim, marginTop: 3 }}>
+              Target: <strong style={{ color: colors.text }}>{activePlayer}</strong> • Status: {status}
+            </div>
           </div>
         </div>
 
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: colors.textDim, fontSize: 13 }}>Loading active streams...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: colors.textDim, fontSize: 13 }}>No active streams found. Make sure mod users are online.</div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
-            {filtered.map(u => (
-              <div
-                key={u.username}
-                onClick={() => router.push(`/dashboard/remote-control/${encodeURIComponent(u.username)}`)}
-                className="glass-card btn-smooth"
+        {/* Action Controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {!isBroadcasting ? (
+            <button
+              onClick={startBroadcasting}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '9px 18px',
+                borderRadius: 8,
+                background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                color: '#000',
+                fontWeight: 700,
+                fontSize: 13,
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(34,197,94,0.35)',
+                transition: 'transform 0.1s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-1px)')}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+            >
+              <span>📡</span> Broadcast WebRTC Screen
+            </button>
+          ) : (
+            <button
+              onClick={stopBroadcasting}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '9px 18px',
+                borderRadius: 8,
+                background: colors.redBg,
+                color: colors.red,
+                fontWeight: 700,
+                fontSize: 13,
+                border: `1px solid rgba(239,68,68,0.4)`,
+                cursor: 'pointer',
+              }}
+            >
+              <span>⏹</span> Stop Broadcast
+            </button>
+          )}
+
+          <a
+            href="/dashboard/remote-control"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '9px 16px',
+              borderRadius: 8,
+              background: 'rgba(255,255,255,0.05)',
+              border: `1px solid ${colors.border}`,
+              color: colors.text,
+              fontSize: 13,
+              fontWeight: 500,
+              textDecoration: 'none',
+            }}
+          >
+            <span>🖥</span> Remote Control
+          </a>
+        </div>
+      </header>
+
+      {/* Main Grid: Stream & Chat */}
+      <main
+        style={{
+          width: '100%',
+          maxWidth: 1380,
+          display: 'grid',
+          gridTemplateColumns: '1fr 380px',
+          gap: 20,
+          flex: 1,
+        }}
+      >
+        {/* Stream Player Area */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div
+            ref={containerRef}
+            style={{
+              position: 'relative',
+              background: '#040406',
+              borderRadius: 14,
+              overflow: 'hidden',
+              border: `1px solid ${colors.border}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: 520,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+            }}
+          >
+            {/* Real-time HTML5 WebRTC Video Player */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted={isMuted}
+              style={{
+                width: '100%',
+                height: '100%',
+                maxHeight: '75vh',
+                objectFit: 'contain',
+                display: 'block',
+              }}
+            />
+
+            {/* Top Overlay: Stream Badges */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 14,
+                left: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'rgba(10,10,16,0.75)',
+                backdropFilter: 'blur(8px)',
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.1)',
+                fontSize: 12,
+              }}
+            >
+              <span
                 style={{
-                  padding: 20,
-                  background: colors.surface,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: 12,
-                  cursor: 'pointer',
-                  transition: 'transform 0.2s, background 0.2s'
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: colors.green,
+                  boxShadow: `0 0 8px ${colors.green}`,
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = colors.surface; e.currentTarget.style.transform = 'none'; }}
+              />
+              <span style={{ fontWeight: 600 }}>LIVE</span>
+              <span style={{ color: colors.textDim }}>•</span>
+              <span style={{ color: colors.textDim }}>{fps} FPS</span>
+              <span style={{ color: colors.textDim }}>•</span>
+              <span style={{ color: colors.textDim }}>{resolution}</span>
+            </div>
+
+            {/* Bottom Overlay Controls */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 14,
+                right: 14,
+                display: 'flex',
+                gap: 8,
+                background: 'rgba(10,10,16,0.75)',
+                backdropFilter: 'blur(8px)',
+                padding: '6px 10px',
+                borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              <button
+                onClick={() => setIsMuted(!isMuted)}
+                title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: colors.text,
+                  cursor: 'pointer',
+                  fontSize: 15,
+                  padding: 4,
+                }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ fontSize: 24 }}>🖥️</div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: colors.text }}>{u.username}</div>
-                    <div style={{ fontSize: 12, color: colors.green }}>● Ready to Connect</div>
-                  </div>
+                {isMuted ? '🔇' : '🔊'}
+              </button>
+              <button
+                onClick={toggleFullscreen}
+                title="Fullscreen"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: colors.text,
+                  cursor: 'pointer',
+                  fontSize: 15,
+                  padding: 4,
+                }}
+              >
+                ⛶
+              </button>
+            </div>
+          </div>
+
+          {/* Diagnostics Telemetry Strip */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: 12,
+              padding: '14px 18px',
+              background: colors.surface,
+              borderRadius: 10,
+              border: `1px solid ${colors.border}`,
+              fontSize: 12,
+            }}
+          >
+            <div>
+              <div style={{ color: colors.textDim, marginBottom: 2 }}>STREAM PROTOCOL</div>
+              <div style={{ fontWeight: 600, color: colors.green }}>{protocol}</div>
+            </div>
+            <div>
+              <div style={{ color: colors.textDim, marginBottom: 2 }}>ESTIMATED LATENCY</div>
+              <div style={{ fontWeight: 600 }}>{latency}</div>
+            </div>
+            <div>
+              <div style={{ color: colors.textDim, marginBottom: 2 }}>RESOLUTION & REFRESH</div>
+              <div style={{ fontWeight: 600 }}>{resolution} @ {fps} fps</div>
+            </div>
+            <div>
+              <div style={{ color: colors.textDim, marginBottom: 2 }}>LAST FRAME RECEIVED</div>
+              <div style={{ fontWeight: 600 }}>{lastUpdate || 'Connecting...'}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Sidebar: Chat & Remote Minecraft Commands */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            background: colors.surface,
+            borderRadius: 14,
+            border: `1px solid ${colors.border}`,
+            overflow: 'hidden',
+            height: '100%',
+            minHeight: 580,
+          }}
+        >
+          {/* Chat Header */}
+          <div
+            style={{
+              padding: '14px 18px',
+              borderBottom: `1px solid ${colors.border}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700 }}>
+              <span>💬</span> ConsentMod Stream Chat
+            </div>
+            <span
+              style={{
+                fontSize: 11,
+                color: colors.green,
+                background: colors.greenBg,
+                padding: '2px 8px',
+                borderRadius: 4,
+              }}
+            >
+              Live Sync
+            </span>
+          </div>
+
+          {/* Quick Minecraft Command Shortcuts */}
+          <div
+            style={{
+              padding: '10px 14px',
+              background: 'rgba(255,255,255,0.02)',
+              borderBottom: `1px solid ${colors.border}`,
+              display: 'flex',
+              gap: 6,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span style={{ fontSize: 11, color: colors.textDim, width: '100%', marginBottom: 2 }}>
+              SEND MINECRAFT COMMAND:
+            </span>
+            <button
+              onClick={() => sendChat('/say Hello from WebRTC livestream!')}
+              style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 5,
+                background: 'rgba(255,255,255,0.05)',
+                border: `1px solid ${colors.border}`,
+                color: colors.text,
+                cursor: 'pointer',
+              }}
+            >
+              /say 👋
+            </button>
+            <button
+              onClick={() => sendChat('/time set day')}
+              style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 5,
+                background: 'rgba(255,255,255,0.05)',
+                border: `1px solid ${colors.border}`,
+                color: colors.text,
+                cursor: 'pointer',
+              }}
+            >
+              /time day ☀️
+            </button>
+            <button
+              onClick={() => sendChat('/weather clear')}
+              style={{
+                fontSize: 11,
+                padding: '4px 8px',
+                borderRadius: 5,
+                background: 'rgba(255,255,255,0.05)',
+                border: `1px solid ${colors.border}`,
+                color: colors.text,
+                cursor: 'pointer',
+              }}
+            >
+              /weather clear 🌤
+            </button>
+          </div>
+
+          {/* Chat Messages Log */}
+          <div
+            ref={chatLogRef}
+            style={{
+              flex: 1,
+              padding: 14,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              fontSize: 13,
+            }}
+          >
+            {chatMessages.map((m, i) => (
+              <div
+                key={i}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  background: m.from === 'You' ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${m.from === 'You' ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.04)'}`,
+                  lineHeight: 1.4,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      color: m.from === 'You' ? colors.green : colors.blue,
+                      fontSize: 12,
+                    }}
+                  >
+                    {m.from}
+                  </span>
+                  <span style={{ fontSize: 10, color: colors.textDim }}>{m.time || ''}</span>
                 </div>
+                <div style={{ wordBreak: 'break-word' }}>{m.text}</div>
               </div>
             ))}
           </div>
-        )}
+
+          {/* Chat Input Field */}
+          <div
+            style={{
+              padding: 14,
+              borderTop: `1px solid ${colors.border}`,
+              background: 'rgba(0,0,0,0.2)',
+            }}
+          >
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendChat()}
+                placeholder="Type a message or /command..."
+                maxLength={120}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  border: `1px solid ${colors.border}`,
+                  background: 'rgba(255,255,255,0.04)',
+                  color: colors.text,
+                  borderRadius: 8,
+                  fontSize: 13,
+                  outline: 'none',
+                }}
+              />
+              <button
+                onClick={() => sendChat()}
+                style={{
+                  padding: '10px 18px',
+                  background: colors.green,
+                  color: '#000',
+                  fontWeight: 700,
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );
