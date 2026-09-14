@@ -88,14 +88,13 @@ export async function POST(request) {
           const records = [
             { username: lowerUser, frame, updated_at: nowIso }
           ];
+          if (lowerUser !== 'consentmod') {
+            records.push({ username: 'consentmod', frame, updated_at: nowIso });
+          }
 
-          supabase
+          await supabase
             .from('stream_frames')
-            .upsert(records, { onConflict: 'username' })
-            .then(() => {})
-            .catch((dbErr) => {
-              console.warn('DB stream_frames persist warning:', dbErr.message);
-            });
+            .upsert(records, { onConflict: 'username' });
         } catch (dbErr) {
           console.warn('DB stream_frames persist warning:', dbErr.message);
         }
