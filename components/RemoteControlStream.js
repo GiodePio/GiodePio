@@ -822,7 +822,7 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
               boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
             }}
           >
-            {/* Fallback image when WebRTC is connecting or frame stream is active */}
+            {/* Direct High-Quality Live Image Stream */}
             {fallbackFrame && (
               <img
                 src={fallbackFrame}
@@ -833,12 +833,12 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
                   width: '100%',
                   height: '100%',
                   objectFit: 'contain',
-                  zIndex: 0,
+                  zIndex: 2,
                 }}
               />
             )}
 
-            {/* HTML5 WebRTC Video Player */}
+            {/* HTML5 WebRTC Video Player (shown when P2P is active) */}
             <video
               ref={videoRef}
               autoPlay
@@ -849,7 +849,7 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
                 height: '100%',
                 maxHeight: '68vh',
                 objectFit: 'contain',
-                display: 'block',
+                display: videoRef.current && videoRef.current.dataset.source === 'p2p' ? 'block' : (!fallbackFrame ? 'block' : 'none'),
                 position: 'relative',
                 zIndex: 1,
               }}

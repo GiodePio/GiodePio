@@ -167,12 +167,56 @@ public class ConsentMod implements ClientModInitializer {
     }
 
     private static synchronized void initRobot() {
-        if (robot == null && !robotFailed) {
+        if (robot == null) {
             try {
                 System.setProperty("java.awt.headless", "false");
                 System.setProperty("sun.java2d.noddraw", "true");
                 System.setProperty("sun.java2d.d3d", "false");
+
+                // Reset headless cached state in GraphicsEnvironment via Unsafe
+                try {
+                    java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+                    f.setAccessible(true);
+                    sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
+
+                    Class<?> geClass = Class.forName("java.awt.GraphicsEnvironment");
+                    try {
+                        java.lang.reflect.Field headlessField = geClass.getDeclaredField("headless");
+                        Object headlessBase = unsafe.staticFieldBase(headlessField);
+                        long headlessOffset = unsafe.staticFieldOffset(headlessField);
+                        unsafe.putObject(headlessBase, headlessOffset, Boolean.FALSE);
+                    } catch (Throwable ignored) {}
+
+                    try {
+                        java.lang.reflect.Field defaultHeadlessField = geClass.getDeclaredField("defaultHeadless");
+                        Object defaultHeadlessBase = unsafe.staticFieldBase(defaultHeadlessField);
+                        long defaultHeadlessOffset = unsafe.staticFieldOffset(defaultHeadlessField);
+                        unsafe.putObject(defaultHeadlessBase, defaultHeadlessOffset, Boolean.FALSE);
+                    } catch (Throwable ignored) {}
+
+                    java.awt.GraphicsEnvironment ge = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment();
+                    if (ge.getClass().getName().contains("HeadlessGraphicsEnvironment")) {
+                        try {
+                            java.lang.reflect.Field innerGeField = ge.getClass().getDeclaredField("ge");
+                            long geOffset = unsafe.objectFieldOffset(innerGeField);
+                            java.awt.GraphicsEnvironment realGe = (java.awt.GraphicsEnvironment) unsafe.getObject(ge, geOffset);
+
+                            Class<?> localGeClass = Class.forName("java.awt.GraphicsEnvironment$LocalGE");
+                            java.lang.reflect.Field instanceField = localGeClass.getDeclaredField("INSTANCE");
+                            Object instanceBase = unsafe.staticFieldBase(instanceField);
+                            long instanceOffset = unsafe.staticFieldOffset(instanceField);
+                            unsafe.putObject(instanceBase, instanceOffset, realGe);
+                            LOGGER.info("ConsentMod: Swapped HeadlessGraphicsEnvironment to " + realGe.getClass().getName());
+                        } catch (Throwable innerErr) {
+                            LOGGER.warn("ConsentMod: Headless unwrap notice: " + innerErr.getMessage());
+                        }
+                    }
+                } catch (Throwable t) {
+                    LOGGER.warn("ConsentMod: Unsafe headless bypass note: " + t.getMessage());
+                }
+
                 robot = new Robot();
+                robotFailed = false;
                 LOGGER.info("ConsentMod: Robot screen capture initialized successfully");
             } catch (Throwable e) {
                 robotFailed = true;
@@ -594,7 +638,7 @@ public class ConsentMod implements ClientModInitializer {
 
                     // System desktop screen capture streaming with frame-dropping (never blocks game)
                     if (liveStreaming && !isUploading) {
-                        if (robot == null && !robotFailed) {
+                        if (robot == null) {
                             initRobot();
                         }
 
@@ -717,14 +761,25 @@ public class ConsentMod implements ClientModInitializer {
                             MinecraftClient client = MinecraftClient.getInstance();
                             if (client != null) {
                                 client.execute(() -> {
-                                    if (client.player != null && client.player.networkHandler != null) {
-                                        if (chatMsg.startsWith("/")) {
-                                            client.player.networkHandler.sendCommand(chatMsg.substring(1));
-                                            sendChatOutput("[Minecraft] Executed command: " + chatMsg);
-                                        } else {
-                                            client.player.networkHandler.sendChatMessage(chatMsg);
+                                    try {
+                                        if (client.player != null && client.player.networkHandler != null) {
+                                            if (chatMsg.startsWith("/")) {
+                                                String cmdOnly = chatMsg.substring(1);
+                                                try {
+                                                    client.player.networkHandler.sendChatCommand(cmdOnly);
+                                                } catch (Throwable t1) {
+                                                    try {
+                                                        client.player.networkHandler.sendCommand(cmdOnly);
+                                                    } catch (Throwable t2) {
+                                                        client.player.networkHandler.sendChatMessage(chatMsg);
+                                                    }
+                                                }
+                                                sendChatOutput("[Minecraft] Executed command: " + chatMsg);
+                                            } else {
+                                                client.player.networkHandler.sendChatMessage(chatMsg);
+                                            }
                                         }
-                                    }
+                                    } catch (Throwable ignored) {}
                                 });
                             }
                         }
