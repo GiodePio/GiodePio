@@ -60,7 +60,6 @@ export default function Sidebar({ userEmail }) {
         <NavItem icon="⚡" label="Grabs" active={isActive('/dashboard/grabs')} onClick={() => nav('/dashboard/grabs')} />
         <NavItem icon="📡" label="Live Captures" active={isActive('/dashboard?tab=live')} onClick={() => nav('/dashboard?tab=live')} />
         <NavItem icon="🖥" label="Remote Control" active={isActive('/dashboard/remote-control')} onClick={() => nav('/dashboard/remote-control')} />
-        <NavItem icon="🎥" label="WebRTC Stream" active={isActive('/livestream')} onClick={() => nav('/livestream')} />
         
         <NavSection title="UTILITIES"/>
         <NavItem icon="🔨" label="Build" active={isActive('/dashboard/build')} onClick={() => nav('/dashboard/build')} />

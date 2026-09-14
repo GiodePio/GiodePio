@@ -547,6 +547,24 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Back to Devices link */}
+      <div
+        onClick={() => router.push('/dashboard/remote-control')}
+        style={{
+          cursor: 'pointer',
+          color: colors.textDim,
+          fontSize: 13,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          width: 'fit-content',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = colors.text)}
+        onMouseLeave={(e) => (e.currentTarget.style.color = colors.textDim)}
+      >
+        ← Back to Online Devices
+      </div>
+
       {/* Top Header Card */}
       <div
         className="glass-card"

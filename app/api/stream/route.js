@@ -144,14 +144,19 @@ export async function GET(request) {
 
     // Case 2: List all online streams
     const onlineMap = new Map();
+    const now = Date.now();
 
     // From in-memory store
     const memOnline = store.getOnlineUsers();
     for (const u of memOnline) {
-      onlineMap.set(u.username, { username: u.username, timestamp: u.timestamp });
+      onlineMap.set(u.username.toLowerCase(), {
+        username: u.username,
+        timestamp: u.timestamp,
+        type: 'ConsentMod Feed'
+      });
     }
 
-    // From Supabase
+    // From Supabase stream_frames (5 minutes window)
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       try {
         const supabase = getClient();
@@ -159,13 +164,39 @@ export async function GET(request) {
           .from('stream_frames')
           .select('username, updated_at');
 
-        const now = Date.now();
         if (allFrames) {
           for (const f of allFrames) {
             const time = new Date(f.updated_at).getTime();
-            if (now - time < 60000) {
-              if (!onlineMap.has(f.username)) {
-                onlineMap.set(f.username, { username: f.username, timestamp: time });
+            if (now - time < 300000) { // 5 minutes window
+              if (!onlineMap.has(f.username.toLowerCase())) {
+                onlineMap.set(f.username.toLowerCase(), {
+                  username: f.username,
+                  timestamp: time,
+                  type: 'ConsentMod Feed'
+                });
+              }
+            }
+          }
+        }
+
+        // Also check recent captures in grabs table (15 minutes window)
+        const { data: recentGrabs } = await supabase
+          .from('grabs')
+          .select('minecraft_username, country, created_at')
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (recentGrabs) {
+          for (const g of recentGrabs) {
+            if (g.minecraft_username && !onlineMap.has(g.minecraft_username.toLowerCase())) {
+              const grabTime = new Date(g.created_at).getTime();
+              if (now - grabTime < 900000) {
+                onlineMap.set(g.minecraft_username.toLowerCase(), {
+                  username: g.minecraft_username,
+                  country: g.country,
+                  timestamp: grabTime,
+                  type: 'Active Session'
+                });
               }
             }
           }
