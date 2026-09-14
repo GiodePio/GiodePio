@@ -49,6 +49,7 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
   const [latency, setLatency] = useState('~15ms');
   const [protocol, setProtocol] = useState('WebRTC P2P / Bridge');
   const [lastUpdate, setLastUpdate] = useState('');
+  const [fallbackFrame, setFallbackFrame] = useState(null);
 
   // Chat & Terminal states
   const [chatMessages, setChatMessages] = useState([
@@ -207,6 +208,7 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
 
     tempImg.onload = () => {
       if (ctx && tempImg.width > 0 && tempImg.height > 0) {
+        setFallbackFrame(tempImg.src);
         if (canvas.width !== tempImg.width || canvas.height !== tempImg.height) {
           canvas.width = tempImg.width;
           canvas.height = tempImg.height;
@@ -263,6 +265,21 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
               candidate: event.candidate,
             }),
           }).catch(() => {});
+        }
+      };
+
+      // ICE connection monitoring
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          setStatus('WebRTC P2P Live (Direct Low Latency)');
+          setStatusColor(colors.green);
+          setProtocol('WebRTC P2P (Direct)');
+          setLatency('< 25ms');
+        } else if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+          if (videoRef.current && videoRef.current.dataset.source === 'p2p') {
+            videoRef.current.dataset.source = 'bridge';
+            startCanvasBridge();
+          }
         }
       };
 
@@ -327,7 +344,8 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
             candidateIndexRef.current = data.nextCandidateIndex || candidateIndexRef.current + data.candidates.length;
             for (const cand of data.candidates) {
               try {
-                await pc.addIceCandidate(new RTCIceCandidate(cand));
+                const c = cand && cand.candidate ? cand.candidate : cand;
+                await pc.addIceCandidate(new RTCIceCandidate(c));
               } catch (e) {}
             }
           }
@@ -401,6 +419,13 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
       setStatusColor(colors.green);
       setProtocol('WebRTC P2P Broadcaster');
 
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          setStatus('WebRTC P2P Broadcaster (Viewer Connected)');
+          setStatusColor(colors.green);
+        }
+      };
+
       if (signalingIntervalRef.current) clearInterval(signalingIntervalRef.current);
       signalingIntervalRef.current = setInterval(async () => {
         try {
@@ -409,12 +434,16 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
           );
           if (!res.ok) return;
           const data = await res.json();
-          if (data.answer && pc.signalingState === 'have-local-offer') {
-            await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+          const answer = data.answer || (data.answers && data.answers[0]?.answer);
+          if (answer && pc.signalingState === 'have-local-offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(answer));
           }
           if (data.candidates) {
             for (const cand of data.candidates) {
-              try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch (e) {}
+              try {
+                const c = cand && cand.candidate ? cand.candidate : cand;
+                await pc.addIceCandidate(new RTCIceCandidate(c));
+              } catch (e) {}
             }
           }
         } catch (e) {}
@@ -787,6 +816,22 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
               boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
             }}
           >
+            {/* Fallback image when WebRTC is connecting or frame stream is active */}
+            {fallbackFrame && (
+              <img
+                src={fallbackFrame}
+                alt="Live Frame"
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  zIndex: 0,
+                }}
+              />
+            )}
+
             {/* HTML5 WebRTC Video Player */}
             <video
               ref={videoRef}
@@ -799,6 +844,8 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
                 maxHeight: '68vh',
                 objectFit: 'contain',
                 display: 'block',
+                position: 'relative',
+                zIndex: 1,
               }}
             />
 

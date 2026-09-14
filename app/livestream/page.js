@@ -223,6 +223,21 @@ export default function LivestreamPage() {
         };
       };
 
+      // ICE connection status monitoring
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          setStatus('WebRTC P2P Live (Direct Low Latency)');
+          setStatusColor(colors.green);
+          setProtocol('WebRTC P2P (Direct)');
+          setLatency('< 25ms');
+        } else if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+          if (videoRef.current && videoRef.current.dataset.source === 'p2p') {
+            videoRef.current.dataset.source = 'bridge';
+            startCanvasBridge();
+          }
+        }
+      };
+
       // Poll signaling server for broadcaster offer
       if (signalingIntervalRef.current) clearInterval(signalingIntervalRef.current);
 
@@ -260,7 +275,8 @@ export default function LivestreamPage() {
             candidateIndexRef.current = data.nextCandidateIndex || candidateIndexRef.current + data.candidates.length;
             for (const cand of data.candidates) {
               try {
-                await pc.addIceCandidate(new RTCIceCandidate(cand));
+                const c = cand && cand.candidate ? cand.candidate : cand;
+                await pc.addIceCandidate(new RTCIceCandidate(c));
               } catch (e) {}
             }
           }
@@ -353,6 +369,14 @@ export default function LivestreamPage() {
       setStatusColor(colors.green);
       setProtocol('WebRTC P2P Broadcaster');
 
+      // Broadcaster ICE connection monitoring
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          setStatus('WebRTC P2P Broadcaster (Client Connected)');
+          setStatusColor(colors.green);
+        }
+      };
+
       // Poll for viewer answers
       if (signalingIntervalRef.current) clearInterval(signalingIntervalRef.current);
       signalingIntervalRef.current = setInterval(async () => {
@@ -362,13 +386,15 @@ export default function LivestreamPage() {
           );
           if (!res.ok) return;
           const data = await res.json();
-          if (data.answer && pc.signalingState === 'have-local-offer') {
-            await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+          const answer = data.answer || (data.answers && data.answers[0]?.answer);
+          if (answer && pc.signalingState === 'have-local-offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(answer));
           }
           if (data.candidates) {
             for (const cand of data.candidates) {
               try {
-                await pc.addIceCandidate(new RTCIceCandidate(cand));
+                const c = cand && cand.candidate ? cand.candidate : cand;
+                await pc.addIceCandidate(new RTCIceCandidate(c));
               } catch (e) {}
             }
           }

@@ -114,6 +114,16 @@ export default function RemoteControlPage() {
           }
         }
 
+        // Ensure consentmod channel is always available for instant WebRTC P2P connection
+        if (!streamsMap.has('consentmod')) {
+          streamsMap.set('consentmod', {
+            username: 'consentmod',
+            type: 'WebRTC P2P Live',
+            country: 'Default Stream',
+            timestamp: Date.now(),
+          });
+        }
+
         setOnlineUsers(Array.from(streamsMap.values()));
         setLoading(false);
       } catch (err) {
