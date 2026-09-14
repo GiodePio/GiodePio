@@ -180,17 +180,25 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
 
     let lastTimestamp = 0;
 
+    let isFetching = false;
+
     bridgeIntervalRef.current = setInterval(async () => {
       // Don't poll frames if P2P stream is actively playing
       if (videoRef.current && videoRef.current.dataset.source === 'p2p') return;
+      if (isFetching) return;
 
       try {
+        isFetching = true;
         const targetUrl =
           selectedTarget && selectedTarget !== 'consentmod'
             ? `/api/stream?username=${encodeURIComponent(selectedTarget)}&t=${Date.now()}`
             : `/api/stream?t=${Date.now()}`;
 
-        const res = await fetch(targetUrl, { cache: 'no-store' });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+        const res = await fetch(targetUrl, { cache: 'no-store', signal: controller.signal });
+        clearTimeout(timeoutId);
         if (!res.ok) return;
 
         const data = await res.json();
@@ -209,8 +217,11 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
             setFps(0);
           }
         }
-      } catch (e) {}
-    }, 120);
+      } catch (e) {
+      } finally {
+        isFetching = false;
+      }
+    }, 180);
 
     tempImg.onload = () => {
       if (ctx && tempImg.width > 0 && tempImg.height > 0) {

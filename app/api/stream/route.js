@@ -78,7 +78,7 @@ export async function POST(request) {
       const base64 = nodeBuf.toString('base64');
       const frame = 'data:image/jpeg;base64,' + base64;
 
-      // Persist to Supabase stream_frames table immediately for live multi-instance viewing
+      // Persist to Supabase asynchronously in background so POST response returns in <5ms
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
         try {
           const supabase = getClient();
@@ -92,9 +92,13 @@ export async function POST(request) {
             records.push({ username: 'consentmod', frame, updated_at: nowIso });
           }
 
-          await supabase
+          supabase
             .from('stream_frames')
-            .upsert(records, { onConflict: 'username' });
+            .upsert(records, { onConflict: 'username' })
+            .then(() => {})
+            .catch((dbErr) => {
+              console.warn('DB stream_frames persist warning:', dbErr.message);
+            });
         } catch (dbErr) {
           console.warn('DB stream_frames persist warning:', dbErr.message);
         }
