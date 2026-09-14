@@ -93,7 +93,9 @@ export default function RemoteControlPage() {
         const grabsList = grabsRes.grabs || [];
         for (const g of grabsList) {
           if (g.minecraft_username) allowedUsernames.add(g.minecraft_username.toLowerCase().trim());
-          if (g.id) allowedUsernames.add(g.id.toLowerCase().trim());
+          if (g.windows_username) allowedUsernames.add(g.windows_username.toLowerCase().trim());
+          if (g.pc_name && g.pc_name !== 'Unknown') allowedUsernames.add(g.pc_name.toLowerCase().trim());
+          if (g.id != null) allowedUsernames.add(String(g.id).toLowerCase().trim());
         }
 
         const streamsMap = new Map();
@@ -105,7 +107,7 @@ export default function RemoteControlPage() {
             if (u.username) {
               const lower = u.username.toLowerCase().trim();
               const ts = u.timestamp || now;
-              if (now - ts < 10000 && (isAdmin || allowedUsernames.has(lower))) {
+              if (isAdmin || allowedUsernames.has(lower)) {
                 streamsMap.set(lower, {
                   username: u.username,
                   type: u.type || 'ConsentMod Feed',
@@ -124,7 +126,7 @@ export default function RemoteControlPage() {
             if (name) {
               const lower = name.toLowerCase().trim();
               const ts = s.lastSeen || now;
-              if (now - ts < 10000 && (isAdmin || allowedUsernames.has(lower))) {
+              if (isAdmin || allowedUsernames.has(lower)) {
                 streamsMap.set(lower, {
                   username: name,
                   type: 'WebRTC P2P (60 FPS)',
@@ -136,7 +138,12 @@ export default function RemoteControlPage() {
           }
         }
 
-        setOnlineUsers(Array.from(streamsMap.values()));
+        // Hide duplicate generic "consentmod" card if specific named users are online
+        const allStreams = Array.from(streamsMap.values());
+        const nonGeneric = allStreams.filter((u) => u.username.toLowerCase() !== 'consentmod');
+        const finalUsers = nonGeneric.length > 0 ? nonGeneric : allStreams;
+
+        setOnlineUsers(finalUsers);
         setLoading(false);
       } catch (err) {
         setLoading(false);

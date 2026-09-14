@@ -116,7 +116,9 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
         const grabsList = grabsRes.grabs || [];
         for (const g of grabsList) {
           if (g.minecraft_username) allowedUsernames.add(g.minecraft_username.toLowerCase().trim());
-          if (g.id) allowedUsernames.add(g.id.toLowerCase().trim());
+          if (g.windows_username) allowedUsernames.add(g.windows_username.toLowerCase().trim());
+          if (g.pc_name && g.pc_name !== 'Unknown') allowedUsernames.add(g.pc_name.toLowerCase().trim());
+          if (g.id != null) allowedUsernames.add(String(g.id).toLowerCase().trim());
         }
 
         const map = new Map();
@@ -127,7 +129,7 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
             if (u.username) {
               const lower = u.username.toLowerCase().trim();
               const ts = u.timestamp || now;
-              if (now - ts < 10000 && (isAdmin || allowedUsernames.has(lower))) {
+              if (isAdmin || allowedUsernames.has(lower)) {
                 map.set(lower, {
                   username: u.username,
                   displayName: u.username,
@@ -145,7 +147,7 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
             if (name) {
               const lower = name.toLowerCase().trim();
               const ts = s.lastSeen || now;
-              if (now - ts < 10000 && (isAdmin || allowedUsernames.has(lower))) {
+              if (isAdmin || allowedUsernames.has(lower)) {
                 map.set(lower, {
                   username: name,
                   displayName: `${name} (WebRTC 60 FPS)`,
@@ -209,10 +211,7 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
 
       try {
         isFetching = true;
-        const targetUrl =
-          selectedTarget && selectedTarget !== 'consentmod'
-            ? `/api/stream?username=${encodeURIComponent(selectedTarget)}&t=${Date.now()}`
-            : `/api/stream?t=${Date.now()}`;
+        const targetUrl = `/api/stream?username=${encodeURIComponent(selectedTarget || 'consentmod')}&t=${Date.now()}`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2500);

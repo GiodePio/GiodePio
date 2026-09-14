@@ -69,7 +69,7 @@ export default function GrabDetailPage() {
         if (d.user?.email) {
           const normEmail = d.user.email.toLowerCase().trim();
           setUserEmail(normEmail);
-          if (normEmail === 'lifegrading@gmail.com') {
+          if (normEmail === 'lifegrading@gmail.com' || normEmail === 'giodewaard152@gmail.com') {
             setIsPro(true);
             setProChecked(true);
           } else {

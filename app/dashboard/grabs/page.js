@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 
+const ADMIN_EMAILS = ['lifegrading@gmail.com', 'giodewaard152@gmail.com'];
+
 const colors = {
   bg: '#050508',
   panel: 'rgba(13, 13, 18, 0.7)',
@@ -59,7 +61,7 @@ export default function GrabsPage() {
         if (d.user?.email) {
           const normEmail = d.user.email.toLowerCase().trim();
           setUserEmail(normEmail);
-          if (normEmail === 'lifegrading@gmail.com') {
+          if (ADMIN_EMAILS.includes(normEmail)) {
             setIsPro(true);
             setProChecked(true);
             return fetch('/api/grabs');
@@ -116,7 +118,7 @@ export default function GrabsPage() {
     );
   }
 
-  const isOwner = userEmail === 'lifegrading@gmail.com';
+  const isOwner = ADMIN_EMAILS.includes(userEmail);
 
   return (
     <div className="page-enter" style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>

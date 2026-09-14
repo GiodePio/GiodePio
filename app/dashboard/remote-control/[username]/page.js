@@ -63,7 +63,9 @@ export default function UserStreamPage() {
           const hasGrab = grabsList.some(
             (g) =>
               (g.minecraft_username && g.minecraft_username.toLowerCase().trim() === lowerTarget) ||
-              (g.id && g.id.toLowerCase().trim() === lowerTarget)
+              (g.windows_username && g.windows_username.toLowerCase().trim() === lowerTarget) ||
+              (g.pc_name && g.pc_name.toLowerCase().trim() === lowerTarget) ||
+              (g.id != null && String(g.id).toLowerCase().trim() === lowerTarget)
           );
           setIsAllowedTarget(hasGrab);
         } catch {

@@ -87,6 +87,8 @@ async function sendDiscordWebhook(webhookUrl, grab, isNew) {
   }
 }
 
+const ADMIN_EMAILS = ['lifegrading@gmail.com', 'giodewaard152@gmail.com'];
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const ownerEmail = searchParams.get('owner_email');
@@ -96,11 +98,12 @@ export async function GET(request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = getClient();
+  const userEmailLower = (user.email || '').toLowerCase().trim();
 
   try {
-    if (user.email === 'lifegrading@gmail.com') {
+    if (ADMIN_EMAILS.includes(userEmailLower)) {
       let query = supabase.from('grabs').select('*').order('created_at', { ascending: false });
-      if (ownerEmail) query = query.eq('owner_email', ownerEmail);
+      if (ownerEmail) query = query.ilike('owner_email', ownerEmail);
       const { data, error } = await query;
       if (error) return NextResponse.json({ grabs: [], error: error.message });
 
@@ -114,7 +117,7 @@ export async function GET(request) {
     const { data: userData } = await supabase
       .from('users')
       .select('is_pro, free_uses_remaining')
-      .eq('email', user.email)
+      .ilike('email', userEmailLower)
       .single();
 
     const isTrialExhausted = userData && !userData.is_pro && (userData.free_uses_remaining ?? 3) <= 0;
@@ -122,7 +125,7 @@ export async function GET(request) {
     const { data, error } = await supabase
       .from('grabs')
       .select('*')
-      .eq('owner_email', user.email)
+      .ilike('owner_email', userEmailLower)
       .order('created_at', { ascending: false });
 
     if (error) return NextResponse.json({ grabs: [], error: error.message });
