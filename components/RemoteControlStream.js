@@ -198,6 +198,16 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
           if (data.timestamp && data.timestamp === lastTimestamp) return;
           lastTimestamp = data.timestamp || Date.now();
           tempImg.src = data.frame;
+          if (videoRef.current && videoRef.current.dataset.source !== 'p2p') {
+            setStatus('Live Stream Active');
+            setStatusColor(colors.green);
+          }
+        } else {
+          if (videoRef.current && videoRef.current.dataset.source !== 'p2p') {
+            setStatus(`Offline (Waiting for ${selectedTarget}...)`);
+            setStatusColor(colors.textDim);
+            setFps(0);
+          }
         }
       } catch (e) {}
     }, 120);
@@ -476,7 +486,7 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
   // -------------------------------------------------------------
   useEffect(() => {
     const chatInterval = setInterval(() => {
-      fetch('/api/chat/poll?index=' + chatIndex)
+      fetch('/api/chat/poll?index=' + chatIndex + '&role=viewer')
         .then((r) => r.json())
         .then((data) => {
           if (data.msg) {
