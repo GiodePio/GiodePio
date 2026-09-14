@@ -114,7 +114,7 @@ export default function LivestreamPage() {
 
         const data = await res.json();
         if (data.online && data.frame) {
-          if (data.timestamp && data.timestamp === lastTimestamp) return;
+          if (data.timestamp && data.timestamp <= lastTimestamp) return;
           lastTimestamp = data.timestamp || Date.now();
           tempImg.src = data.frame;
           if (data.username) setActivePlayer(data.username);

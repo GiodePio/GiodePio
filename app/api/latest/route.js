@@ -22,11 +22,10 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get('username');
 
-    // 1. Check in-memory store
-    let frame = username ? store.getUserFrame(username) : store.getFrame();
+    let frame = null;
 
-    // 2. If not found in memory, try Supabase database (stream_frames)
-    if (!frame && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    // 1. Check Supabase first for consistency across Vercel instances
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       try {
         const supabase = getClient();
         let query = supabase.from('stream_frames').select('frame, updated_at');
@@ -47,6 +46,11 @@ export async function GET(request) {
       } catch (e) {
         // Silently ignore DB errors on frame lookup
       }
+    }
+
+    // 2. Fall back to in-memory store
+    if (!frame) {
+      frame = username ? store.getUserFrame(username) : store.getFrame();
     }
 
     if (!frame) {

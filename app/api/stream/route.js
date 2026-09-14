@@ -116,10 +116,52 @@ export async function GET(request) {
 
     // Case 1: Specific username requested
     if (username) {
-      // First check in-memory store
-      const memFrame = store.getUserFrame(username);
-      const memTime = store.getFrameTime(username);
-      if (memFrame && memTime && Date.now() - memTime < 60000) {
+      const lowerUser = username.toLowerCase();
+      let dbRow = null;
+      let dbTime = 0;
+
+      // 1. Query Supabase (Single source of truth across Vercel instances)
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+          const supabase = getClient();
+          if (lowerUser !== 'consentmod') {
+            const { data } = await supabase
+              .from('stream_frames')
+              .select('frame, updated_at, username')
+              .ilike('username', lowerUser)
+              .order('updated_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (data && data.frame) dbRow = data;
+          }
+
+          if (!dbRow) {
+            const { data } = await supabase
+              .from('stream_frames')
+              .select('frame, updated_at, username')
+              .ilike('username', 'consentmod')
+              .order('updated_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (data && data.frame) dbRow = data;
+          }
+
+          if (dbRow && dbRow.updated_at) {
+            dbTime = new Date(dbRow.updated_at).getTime();
+          }
+        } catch (dbErr) {
+          console.warn('Supabase fetch frame error:', dbErr.message);
+        }
+      }
+
+      // 2. Check local in-memory hot store
+      const memFrame = store.getUserFrame(lowerUser) || store.getUserFrame('consentmod') || store.getFrame();
+      const memTime = store.getFrameTime(lowerUser) || store.getFrameTime('consentmod') || store.getFrameTime();
+
+      const now = Date.now();
+
+      // Only use memory if it is STRICTLY newer than database and younger than 10 seconds
+      if (memFrame && memTime && memTime > dbTime && (now - memTime < 10000)) {
         const base64 = Buffer.from(memFrame).toString('base64');
         return NextResponse.json({
           online: true,
@@ -129,30 +171,14 @@ export async function GET(request) {
         });
       }
 
-      // Check database
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        try {
-          const supabase = getClient();
-          const lowerUser = username.toLowerCase();
-          const { data: row } = await supabase
-            .from('stream_frames')
-            .select('frame, updated_at')
-            .or(`username.ilike.${lowerUser},username.ilike.consentmod`)
-            .order('updated_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (row && row.frame && Date.now() - new Date(row.updated_at).getTime() < 25000) {
-            return NextResponse.json({
-              online: true,
-              frame: row.frame,
-              timestamp: new Date(row.updated_at).getTime(),
-              source: 'supabase'
-            });
-          }
-        } catch (dbErr) {
-          console.warn('Supabase fetch frame error:', dbErr.message);
-        }
+      // Otherwise, use Supabase if active within 25 seconds
+      if (dbRow && dbRow.frame && (now - dbTime < 25000)) {
+        return NextResponse.json({
+          online: true,
+          frame: dbRow.frame,
+          timestamp: dbTime,
+          source: 'supabase'
+        });
       }
 
       return NextResponse.json({ online: false });

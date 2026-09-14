@@ -195,7 +195,7 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
 
         const data = await res.json();
         if (data.online && data.frame) {
-          if (data.timestamp && data.timestamp === lastTimestamp) return;
+          if (data.timestamp && data.timestamp <= lastTimestamp) return;
           lastTimestamp = data.timestamp || Date.now();
           tempImg.src = data.frame;
           if (videoRef.current && videoRef.current.dataset.source !== 'p2p') {
