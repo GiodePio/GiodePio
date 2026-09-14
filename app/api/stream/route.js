@@ -164,10 +164,11 @@ export async function GET(request) {
             .from('stream_frames')
             .select('frame, updated_at')
             .ilike('username', username)
+            .order('updated_at', { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
 
-          if (row && Date.now() - new Date(row.updated_at).getTime() < 60000) {
+          if (row && row.frame && Date.now() - new Date(row.updated_at).getTime() < 120000) {
             return NextResponse.json({
               online: true,
               frame: row.frame,

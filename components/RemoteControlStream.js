@@ -174,6 +174,9 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
 
     const tempImg = new Image();
     tempImg.crossOrigin = 'anonymous';
+    tempImg.onerror = () => {
+      // Gracefully ignore frame decode / network hiccups without console error
+    };
 
     let lastTimestamp = 0;
 
@@ -188,23 +191,16 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
             : `/api/stream?t=${Date.now()}`;
 
         const res = await fetch(targetUrl, { cache: 'no-store' });
-        if (!res.ok) {
-          tempImg.src = '/api/latest?t=' + Date.now();
-          return;
-        }
+        if (!res.ok) return;
 
         const data = await res.json();
         if (data.online && data.frame) {
           if (data.timestamp && data.timestamp === lastTimestamp) return;
           lastTimestamp = data.timestamp || Date.now();
           tempImg.src = data.frame;
-        } else {
-          tempImg.src = '/api/latest?t=' + Date.now();
         }
-      } catch (e) {
-        tempImg.src = '/api/latest?t=' + Date.now();
-      }
-    }, 40);
+      } catch (e) {}
+    }, 120);
 
     tempImg.onload = () => {
       if (ctx && tempImg.width > 0 && tempImg.height > 0) {

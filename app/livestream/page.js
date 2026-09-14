@@ -100,6 +100,9 @@ export default function LivestreamPage() {
 
     const tempImg = new Image();
     tempImg.crossOrigin = 'anonymous';
+    tempImg.onerror = () => {
+      // Gracefully ignore frame decode hiccups without console error
+    };
 
     let lastTimestamp = 0;
 
@@ -107,25 +110,17 @@ export default function LivestreamPage() {
       // Fetch latest frame from ConsentMod
       try {
         const res = await fetch('/api/stream?username=consentmod&t=' + Date.now(), { cache: 'no-store' });
-        if (!res.ok) {
-          // Fallback to /api/latest
-          tempImg.src = '/api/latest?t=' + Date.now();
-          return;
-        }
+        if (!res.ok) return;
+
         const data = await res.json();
         if (data.online && data.frame) {
           if (data.timestamp && data.timestamp === lastTimestamp) return;
           lastTimestamp = data.timestamp || Date.now();
           tempImg.src = data.frame;
           if (data.username) setActivePlayer(data.username);
-        } else {
-          // Try /api/latest directly
-          tempImg.src = '/api/latest?t=' + Date.now();
         }
-      } catch (e) {
-        tempImg.src = '/api/latest?t=' + Date.now();
-      }
-    }, 40); // ~25-30 fps polling for ConsentMod frame stream
+      } catch (e) {}
+    }, 120);
 
     tempImg.onload = () => {
       if (ctx && tempImg.width > 0 && tempImg.height > 0) {
