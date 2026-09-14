@@ -37,10 +37,13 @@ export async function GET(request) {
           .limit(1)
           .maybeSingle();
 
-        if (row && row.frame) {
-          const match = row.frame.match(/^data:image\/\w+;base64,(.+)$/);
-          if (match) {
-            frame = Buffer.from(match[1], 'base64');
+        if (row && row.frame && row.updated_at) {
+          const dbTime = new Date(row.updated_at).getTime();
+          if (Date.now() - dbTime < 10000) {
+            const match = row.frame.match(/^data:image\/\w+;base64,(.+)$/);
+            if (match) {
+              frame = Buffer.from(match[1], 'base64');
+            }
           }
         }
       } catch (e) {
@@ -48,9 +51,12 @@ export async function GET(request) {
       }
     }
 
-    // 2. Fall back to in-memory store
+    // 2. Fall back to in-memory store (strictly <10s)
     if (!frame) {
-      frame = username ? store.getUserFrame(username) : store.getFrame();
+      const memTime = username ? store.getFrameTime(username) : store.getFrameTime();
+      if (memTime && Date.now() - memTime < 10000) {
+        frame = username ? store.getUserFrame(username) : store.getFrame();
+      }
     }
 
     if (!frame) {

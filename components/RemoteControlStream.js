@@ -11,6 +11,8 @@ const RTC_CONFIG = {
   ],
 };
 
+const ADMIN_EMAILS = ['lifegrading@gmail.com', 'giodewaard152@gmail.com'];
+
 const colors = {
   bg: '#050508',
   surface: '#0f0f17',
@@ -100,40 +102,58 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const [streamRes, webrtcRes] = await Promise.all([
-          fetch('/api/stream').then((r) => r.json()).catch(() => ({ online: [] })),
-          fetch('/api/livestream/webrtc?action=list').then((r) => r.json()).catch(() => ({ streams: [] })),
+        const [authRes, grabsRes, streamRes, webrtcRes] = await Promise.all([
+          fetch('/api/auth/user').then((r) => r.json()).catch(() => ({ user: null })),
+          fetch('/api/grabs?t=' + Date.now()).then((r) => r.json()).catch(() => ({ grabs: [] })),
+          fetch('/api/stream?t=' + Date.now()).then((r) => r.json()).catch(() => ({ online: [] })),
+          fetch('/api/livestream/webrtc?action=list&t=' + Date.now()).then((r) => r.json()).catch(() => ({ streams: [] })),
         ]);
 
+        const userEmail = (authRes.user?.email || '').toLowerCase().trim();
+        const isAdmin = ADMIN_EMAILS.includes(userEmail);
+
+        const allowedUsernames = new Set();
+        const grabsList = grabsRes.grabs || [];
+        for (const g of grabsList) {
+          if (g.minecraft_username) allowedUsernames.add(g.minecraft_username.toLowerCase().trim());
+          if (g.id) allowedUsernames.add(g.id.toLowerCase().trim());
+        }
+
         const map = new Map();
-        map.set('consentmod', {
-          username: 'consentmod',
-          displayName: 'ConsentMod Live (Auto)',
-          isWebRtc: false,
-        });
+        const now = Date.now();
 
         if (streamRes.online && Array.isArray(streamRes.online)) {
           for (const u of streamRes.online) {
-            if (u.username && u.username !== 'consentmod') {
-              map.set(u.username.toLowerCase(), {
-                username: u.username,
-                displayName: u.username,
-                isWebRtc: false,
-                timestamp: u.timestamp,
-              });
+            if (u.username) {
+              const lower = u.username.toLowerCase().trim();
+              const ts = u.timestamp || now;
+              if (now - ts < 10000 && (isAdmin || allowedUsernames.has(lower))) {
+                map.set(lower, {
+                  username: u.username,
+                  displayName: u.username,
+                  isWebRtc: false,
+                  timestamp: ts,
+                });
+              }
             }
           }
         }
 
         if (webrtcRes.streams && Array.isArray(webrtcRes.streams)) {
           for (const s of webrtcRes.streams) {
-            const name = s.metadata?.username || s.streamId || 'WebRTC Broadcaster';
-            map.set(name.toLowerCase(), {
-              username: name,
-              displayName: `${name} (WebRTC 60 FPS)`,
-              isWebRtc: true,
-              timestamp: s.lastSeen,
-            });
+            const name = s.metadata?.username || s.streamId || '';
+            if (name) {
+              const lower = name.toLowerCase().trim();
+              const ts = s.lastSeen || now;
+              if (now - ts < 10000 && (isAdmin || allowedUsernames.has(lower))) {
+                map.set(lower, {
+                  username: name,
+                  displayName: `${name} (WebRTC 60 FPS)`,
+                  isWebRtc: true,
+                  timestamp: ts,
+                });
+              }
+            }
           }
         }
 
@@ -142,7 +162,7 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
     };
 
     fetchDevices();
-    const interval = setInterval(fetchDevices, 4000);
+    const interval = setInterval(fetchDevices, 2500);
     return () => clearInterval(interval);
   }, []);
 
@@ -215,6 +235,7 @@ export default function RemoteControlStream({ initialTarget = 'consentmod', onTa
             setStatus(`Offline (Waiting for ${selectedTarget}...)`);
             setStatusColor(colors.textDim);
             setFps(0);
+            setFallbackFrame(null);
           }
         }
       } catch (e) {

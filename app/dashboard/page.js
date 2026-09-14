@@ -451,20 +451,31 @@ function RemoteControl() {
   const [streamFrame, setStreamFrame] = useState(null);
 
   useEffect(() => {
-    const iv = setInterval(() => {
-      fetch('/api/stream').then(r => r.json()).then(d => setOnlineUsers(d.online || [])).catch(() => {});
-    }, 3000);
+    const fetchStreamList = () => {
+      fetch('/api/stream?t=' + Date.now(), { cache: 'no-store' })
+        .then(r => r.json())
+        .then(d => setOnlineUsers(d.online || []))
+        .catch(() => {});
+    };
+    fetchStreamList();
+    const iv = setInterval(fetchStreamList, 2500);
     return () => clearInterval(iv);
   }, []);
 
   useEffect(() => {
     if (!viewingStream) { setStreamFrame(null); return; }
     const iv = setInterval(() => {
-      fetch('/api/stream?username=' + encodeURIComponent(viewingStream))
+      fetch('/api/stream?username=' + encodeURIComponent(viewingStream) + '&t=' + Date.now(), { cache: 'no-store' })
         .then(r => r.json())
-        .then(d => { if (d.frame) setStreamFrame(d.frame); else { setViewingStream(null); setStreamFrame(null); } })
-        .catch(() => {});
-    }, 500);
+        .then(d => {
+          if (d.online && d.frame) {
+            setStreamFrame(d.frame);
+          } else {
+            setStreamFrame(null);
+          }
+        })
+        .catch(() => setStreamFrame(null));
+    }, 400);
     return () => clearInterval(iv);
   }, [viewingStream]);
 

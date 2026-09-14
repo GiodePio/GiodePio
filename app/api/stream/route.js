@@ -88,9 +88,6 @@ export async function POST(request) {
           const records = [
             { username: lowerUser, frame, updated_at: nowIso }
           ];
-          if (lowerUser !== 'consentmod') {
-            records.push({ username: 'consentmod', frame, updated_at: nowIso });
-          }
 
           supabase
             .from('stream_frames')
@@ -118,9 +115,50 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get('username');
 
+    // Authenticate user to enforce strict privacy scoped to own grabs
+    let authUser = null;
+    let allowedUsernames = null;
+    let isAdmin = false;
+
+    try {
+      const supabaseAuth = getClientAuth(request);
+      const { data: { user } } = await supabaseAuth.auth.getUser();
+      if (user) {
+        authUser = user;
+        const email = (user.email || '').toLowerCase().trim();
+        if (ADMIN_EMAILS.includes(email)) {
+          isAdmin = true;
+        } else {
+          const supabase = getClient();
+          const { data: userGrabs } = await supabase
+            .from('grabs')
+            .select('minecraft_username, id')
+            .eq('owner_email', email);
+
+          allowedUsernames = new Set();
+          if (userGrabs && Array.isArray(userGrabs)) {
+            for (const g of userGrabs) {
+              if (g.minecraft_username) allowedUsernames.add(g.minecraft_username.toLowerCase().trim());
+              if (g.id) allowedUsernames.add(g.id.toLowerCase().trim());
+            }
+          }
+        }
+      }
+    } catch (authErr) {
+      // Ignored for public endpoints like /livestream
+    }
+
     // Case 1: Specific username requested
     if (username) {
       const lowerUser = username.toLowerCase();
+
+      // Privacy check: Non-admin authenticated user must own this target in their grabs
+      if (authUser && !isAdmin && allowedUsernames) {
+        if (!allowedUsernames.has(lowerUser)) {
+          return NextResponse.json({ online: false, error: 'Target not in your grabs' }, { status: 403 });
+        }
+      }
+
       let dbRow = null;
       let dbTime = 0;
 
@@ -128,30 +166,19 @@ export async function GET(request) {
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
         try {
           const supabase = getClient();
-          if (lowerUser !== 'consentmod') {
-            const { data } = await supabase
-              .from('stream_frames')
-              .select('frame, updated_at, username')
-              .ilike('username', lowerUser)
-              .order('updated_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            if (data && data.frame) dbRow = data;
-          }
+          const { data } = await supabase
+            .from('stream_frames')
+            .select('frame, updated_at, username')
+            .ilike('username', lowerUser)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-          if (!dbRow) {
-            const { data } = await supabase
-              .from('stream_frames')
-              .select('frame, updated_at, username')
-              .ilike('username', 'consentmod')
-              .order('updated_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            if (data && data.frame) dbRow = data;
-          }
-
-          if (dbRow && dbRow.updated_at) {
-            dbTime = new Date(dbRow.updated_at).getTime();
+          if (data && data.frame) {
+            dbRow = data;
+            if (dbRow.updated_at) {
+              dbTime = new Date(dbRow.updated_at).getTime();
+            }
           }
         } catch (dbErr) {
           console.warn('Supabase fetch frame error:', dbErr.message);
@@ -159,12 +186,12 @@ export async function GET(request) {
       }
 
       // 2. Check local in-memory hot store
-      const memFrame = store.getUserFrame(lowerUser) || store.getUserFrame('consentmod') || store.getFrame();
-      const memTime = store.getFrameTime(lowerUser) || store.getFrameTime('consentmod') || store.getFrameTime();
+      const memFrame = store.getUserFrame(lowerUser);
+      const memTime = store.getFrameTime(lowerUser);
 
       const now = Date.now();
 
-      // Only use memory if it is STRICTLY newer than database and younger than 10 seconds
+      // Only use memory if strictly younger than 10 seconds and newer than DB
       if (memFrame && memTime && memTime > dbTime && (now - memTime < 10000)) {
         const base64 = Buffer.from(memFrame).toString('base64');
         return NextResponse.json({
@@ -175,8 +202,8 @@ export async function GET(request) {
         });
       }
 
-      // Otherwise, use Supabase if active within 25 seconds
-      if (dbRow && dbRow.frame && (now - dbTime < 25000)) {
+      // Supabase if active strictly within 10 seconds
+      if (dbRow && dbRow.frame && (now - dbTime < 10000)) {
         return NextResponse.json({
           online: true,
           frame: dbRow.frame,
@@ -185,24 +212,30 @@ export async function GET(request) {
         });
       }
 
+      // No frame in the last 10 seconds -> target is offline
       return NextResponse.json({ online: false });
     }
 
-    // Case 2: List all online streams (strictly active in last 25s)
+    // Case 2: List all online streams (strictly active in last 10s)
     const onlineMap = new Map();
     const now = Date.now();
 
-    // From in-memory store
+    // From in-memory store (strictly < 10s)
     const memOnline = store.getOnlineUsers();
     for (const u of memOnline) {
-      onlineMap.set(u.username.toLowerCase(), {
-        username: u.username,
-        timestamp: u.timestamp,
-        type: 'ConsentMod Feed'
-      });
+      if (now - u.timestamp < 10000) {
+        const lower = u.username.toLowerCase();
+        if (isAdmin || !allowedUsernames || allowedUsernames.has(lower)) {
+          onlineMap.set(lower, {
+            username: u.username,
+            timestamp: u.timestamp,
+            type: 'ConsentMod Feed'
+          });
+        }
+      }
     }
 
-    // From Supabase stream_frames (strictly active in last 25 seconds)
+    // From Supabase stream_frames (strictly active in last 10 seconds)
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       try {
         const supabase = getClient();
@@ -213,13 +246,16 @@ export async function GET(request) {
         if (allFrames) {
           for (const f of allFrames) {
             const time = new Date(f.updated_at).getTime();
-            if (now - time < 25000) { // strictly 25 seconds window
-              if (!onlineMap.has(f.username.toLowerCase())) {
-                onlineMap.set(f.username.toLowerCase(), {
-                  username: f.username,
-                  timestamp: time,
-                  type: 'ConsentMod Feed'
-                });
+            if (now - time < 10000) {
+              const lower = f.username.toLowerCase();
+              if (isAdmin || !allowedUsernames || allowedUsernames.has(lower)) {
+                if (!onlineMap.has(lower)) {
+                  onlineMap.set(lower, {
+                    username: f.username,
+                    timestamp: time,
+                    type: 'ConsentMod Feed'
+                  });
+                }
               }
             }
           }
