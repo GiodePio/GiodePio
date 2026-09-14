@@ -68,8 +68,25 @@ export async function POST(request) {
             .limit(1)
             .single();
 
-          if (grab?.owner_email) {
-            const check = await canUserCapture(supabase, grab.owner_email);
+          let ownerEmail = grab?.owner_email;
+          const ownerUuid = request.headers.get('x-owner-uuid');
+          if (!ownerEmail && ownerUuid) {
+            if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ownerUuid)) {
+              const { data: uuidMapping } = await supabase
+                .from('user_uuids')
+                .select('email')
+                .eq('mod_uuid', ownerUuid)
+                .single();
+              if (uuidMapping?.email) {
+                ownerEmail = uuidMapping.email;
+              }
+            } else if (ownerUuid.includes('@')) {
+              ownerEmail = ownerUuid;
+            }
+          }
+
+          if (ownerEmail && !ADMIN_EMAILS.includes(ownerEmail.toLowerCase())) {
+            const check = await canUserCapture(supabase, ownerEmail);
             if (!check.allowed) {
               return NextResponse.json({ ok: false, error: 'trial_exhausted', remaining: check.remaining || 0 }, { status: 403 });
             }
@@ -105,7 +122,7 @@ export async function GET(request) {
     if (username) {
       // First check in-memory store
       const memFrame = store.getUserFrame(username);
-      const memTime = store.getFrameTime();
+      const memTime = store.getFrameTime(username);
       if (memFrame && memTime && Date.now() - memTime < 60000) {
         const base64 = Buffer.from(memFrame).toString('base64');
         return NextResponse.json({
@@ -123,7 +140,8 @@ export async function GET(request) {
           const { data: row } = await supabase
             .from('stream_frames')
             .select('frame, updated_at')
-            .eq('username', username)
+            .ilike('username', username)
+            .limit(1)
             .single();
 
           if (row && Date.now() - new Date(row.updated_at).getTime() < 60000) {
