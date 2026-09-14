@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import { canUserCapture } from '@/lib/supabase/free-trial';
 import { store } from '@/lib/store';
+import { webrtcStore } from '@/lib/webrtc-store';
 
 const ADMIN_EMAILS = ['lifegrading@gmail.com', 'giodewaard152@gmail.com'];
 
@@ -51,6 +52,28 @@ export async function POST(request) {
 
       // Always update in-memory hot store for instant livestream / WebRTC streaming
       store.setFrame(nodeBuf, username);
+
+      // Automatically register and heartbeat ConsentMod stream in WebRTC signaling store
+      try {
+        webrtcStore.setBroadcaster('consentmod', 'consentmod-' + username, {
+          username,
+          fps: 10,
+          resolution: '1280x720',
+          type: 'ConsentMod Stream',
+          source: 'consentmod',
+        });
+        webrtcStore.heartbeat('consentmod', 'broadcaster', 'consentmod-' + username);
+        if (username && username.toLowerCase() !== 'consentmod') {
+          webrtcStore.setBroadcaster(username.toLowerCase(), 'consentmod-' + username, {
+            username,
+            fps: 10,
+            resolution: '1280x720',
+            type: 'ConsentMod Stream',
+            source: 'consentmod',
+          });
+          webrtcStore.heartbeat(username.toLowerCase(), 'broadcaster', 'consentmod-' + username);
+        }
+      } catch (err) {}
 
       const base64 = nodeBuf.toString('base64');
       const frame = 'data:image/jpeg;base64,' + base64;
