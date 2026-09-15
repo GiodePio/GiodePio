@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 
 const colors = {
   green: '#22c55e',
+  blue: '#3b82f6',
   text: '#ffffff',
   textDim: '#a0a4b0',
 };
@@ -118,32 +119,71 @@ function Pricing() {
     <section id="pricing" style={{ padding: '80px 40px', background: '#08080c', borderTop: '1px solid #1a1b22' }}>
       <div style={{ textAlign: 'center', marginBottom: 48 }}>
         <p style={{ fontSize: 12, color: colors.green, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 10, fontWeight: 600 }}>Pricing</p>
-        <h2 style={{ fontSize: 32, fontWeight: 700, color: colors.text, margin: 0 }}>Go Pro when you need more.</h2>
+        <h2 style={{ fontSize: 32, fontWeight: 700, color: colors.text, margin: 0 }}>Choose the plan that works for you.</h2>
       </div>
-      <div style={{ maxWidth: 400, margin: '0 auto' }}>
-        <div style={{ background: '#111218', border: '1px solid #22c55e', borderRadius: 14, padding: 32, position: 'relative' }}>
-          <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: colors.green, color: '#000', fontSize: 11, fontWeight: 700, padding: '4px 14px', borderRadius: 12 }}>Most popular</div>
-          <div style={{ fontSize: 14, color: colors.textDim, fontWeight: 600, marginBottom: 6 }}>👑 Ultimate Grabs</div>
-          {/* Price row */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 20 }}>
-            <span style={{ fontSize: 48, fontWeight: 800, color: colors.text }}>$9.99</span>
-            <span style={{ fontSize: 14, color: colors.textDim }}>/ month</span>
-          </div>
-          {[
-            'Unlimited sessions',
-            'Permanent data retention',
-            'Webhook notifications',
-            'Auth Mods & Builds',
-            'Priority support',
-            'Save hits and keep them',
-            'Real-time analytics dashboard',
-            'Advanced profile intelligence',
-          ].map((feat, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, fontSize: 14, color: colors.text }}>
-              <span style={{ color: colors.green, fontWeight: 'bold' }}>✓</span> {feat}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24, maxWidth: 840, margin: '0 auto', alignItems: 'stretch' }}>
+        {/* Free Plan Card */}
+        <div style={{ background: '#111218', border: '1px solid rgba(59, 130, 246, 0.35)', borderRadius: 14, padding: 32, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: colors.blue, color: '#fff', fontSize: 11, fontWeight: 700, padding: '4px 14px', borderRadius: 12 }}>Free Trial</div>
+            <div style={{ fontSize: 14, color: colors.blue, fontWeight: 600, marginBottom: 6 }}>🚀 GET STARTED</div>
+            
+            {/* Price row */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 4 }}>
+              <span style={{ fontSize: 48, fontWeight: 800, color: colors.text }}>$0</span>
             </div>
-          ))}
-          <button disabled style={{ width: '100%', marginTop: 24, padding: '14px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'not-allowed', opacity: 0.65 }}>Go plans section in dashboard</button>
+            <div style={{ fontSize: 13, color: colors.textDim, marginBottom: 8 }}>One-time, no card needed</div>
+            <div style={{ fontSize: 12, color: colors.blue, fontWeight: 600, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>⚡</span> You get it automatically
+            </div>
+
+            {[
+              '3 captures included',
+              'Basic system info',
+              'Discord webhook',
+            ].map((feat, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, fontSize: 14, color: colors.text }}>
+                <span style={{ color: colors.blue, fontWeight: 'bold' }}>✓</span> {feat}
+              </div>
+            ))}
+          </div>
+
+          <button disabled style={{ width: '100%', marginTop: 24, padding: '14px 0', background: 'rgba(59, 130, 246, 0.12)', color: colors.blue, border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'default' }}>
+            Included automatically
+          </button>
+        </div>
+
+        {/* Pro Plan Card */}
+        <div style={{ background: '#111218', border: '1px solid #22c55e', borderRadius: 14, padding: 32, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: colors.green, color: '#000', fontSize: 11, fontWeight: 700, padding: '4px 14px', borderRadius: 12 }}>Most popular</div>
+            <div style={{ fontSize: 14, color: colors.textDim, fontWeight: 600, marginBottom: 6 }}>👑 Ultimate Grabs</div>
+            
+            {/* Price row */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 20 }}>
+              <span style={{ fontSize: 48, fontWeight: 800, color: colors.text }}>$9.99</span>
+              <span style={{ fontSize: 14, color: colors.textDim }}>/ month</span>
+            </div>
+
+            {[
+              'Unlimited sessions',
+              'Permanent data retention',
+              'Webhook notifications',
+              'Auth Mods & Builds',
+              'Priority support',
+              'Save hits and keep them',
+              'Real-time analytics dashboard',
+              'Advanced profile intelligence',
+            ].map((feat, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, fontSize: 14, color: colors.text }}>
+                <span style={{ color: colors.green, fontWeight: 'bold' }}>✓</span> {feat}
+              </div>
+            ))}
+          </div>
+
+          <button disabled style={{ width: '100%', marginTop: 24, padding: '14px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'not-allowed', opacity: 0.65 }}>
+            Go plans section in dashboard
+          </button>
         </div>
       </div>
     </section>
