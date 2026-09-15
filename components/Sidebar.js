@@ -30,10 +30,12 @@ function NavItem({ icon, label, active, onClick }) {
 
 const NavSection = ({title}) => <div style={{fontSize:10,color:colors.textDim,letterSpacing:2,textTransform:'uppercase',padding:'16px 14px 6px',fontWeight:600}}>{title}</div>;
 
+const ADMIN_EMAILS = ['lifegrading@gmail.com', 'giodewaard152@gmail.com'];
+
 export default function Sidebar({ userEmail }) {
   const router = useRouter();
   const pathname = usePathname();
-  const isOwner = userEmail === 'lifegrading@gmail.com';
+  const isOwner = ADMIN_EMAILS.includes(userEmail?.toLowerCase());
 
   const isActive = (path) => {
     // If the path includes query params like ?tab=plans, we check window.location
@@ -76,7 +78,12 @@ export default function Sidebar({ userEmail }) {
       </div>
       <div>
         <NavItem icon="⚙️" label="Settings" active={isActive('/dashboard/settings')} onClick={() => nav('/dashboard/settings')} />
-        <NavItem icon="🚪" label="Log out" onClick={() => window.location.href = '/api/auth/logout'} />
+        <NavItem icon="🚪" label="Log out" onClick={() => {
+          if (typeof window !== 'undefined') {
+            sessionStorage.clear();
+          }
+          window.location.href = '/api/auth/logout';
+        }} />
       </div>
     </aside>
   );
