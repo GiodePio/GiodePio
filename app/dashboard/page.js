@@ -347,7 +347,22 @@ function Plans({ freeUses, isPro, trialExhausted, userEmail }) {
                         custom_id: userEmail,
                       });
                     }}
-                    onApprove={(data, actions) => {
+                    onApprove={async (data, actions) => {
+                      try {
+                        await fetch('/api/paypal/record', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            subscription_id: data.subscriptionID,
+                            user_email: userEmail,
+                            plan_id: appliedPromo === 'new' ? process.env.NEXT_PUBLIC_PAYPAL_PLAN_DISCOUNTED : process.env.NEXT_PUBLIC_PAYPAL_PLAN_STANDARD,
+                            plan_name: appliedPromo === 'new' ? 'Ultimate Grabs Pro (50% Promo)' : 'Ultimate Grabs Pro (Monthly)',
+                            amount: appliedPromo === 'new' ? '4.99' : '9.99',
+                            currency: 'USD',
+                            status: 'ACTIVE'
+                          })
+                        });
+                      } catch (e) {}
                       alert("Subscription successful! Your Pro status will activate within 30 seconds.");
                     }}
                   />

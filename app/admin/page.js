@@ -728,6 +728,656 @@ function DeploymentsView() {
   );
 }
 
+const ADMIN_EMAILS = ['lifegrading@gmail.com', 'giodewaard152@gmail.com'];
+
+// ─── Section: +Rep Reviews & Comments ──────────────────────────────────────────
+function RepsAdminView() {
+  const [reps, setReps] = useState([]);
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [commentInputs, setCommentInputs] = useState({});
+  const [submittingComment, setSubmittingComment] = useState({});
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [repsRes, commRes] = await Promise.all([
+        fetch('/api/reps').then(r => r.json()),
+        fetch('/api/admin/reps/comments').then(r => r.json())
+      ]);
+      setReps(repsRes.reps || []);
+      setComments(commRes.comments || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleAddComment = async (repId) => {
+    const text = commentInputs[repId]?.trim();
+    if (!text) return;
+
+    setSubmittingComment(prev => ({ ...prev, [repId]: true }));
+    try {
+      const res = await fetch('/api/admin/reps/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rep_id: repId, text, author_name: 'Admin' })
+      });
+      const data = await res.json();
+      if (res.ok && data.comment) {
+        setComments(prev => [...prev, data.comment]);
+        setCommentInputs(prev => ({ ...prev, [repId]: '' }));
+      } else {
+        alert(data.error || 'Failed to post comment');
+      }
+    } catch (e) {
+      alert('Network error: ' + e.message);
+    } finally {
+      setSubmittingComment(prev => ({ ...prev, [repId]: false }));
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!confirm('Are you sure you want to delete this comment?')) return;
+    try {
+      const res = await fetch(`/api/admin/reps/comments?id=${encodeURIComponent(commentId)}`, { method: 'DELETE' });
+      if (res.ok) {
+        setComments(prev => prev.filter(c => c.id !== commentId));
+      }
+    } catch (e) {
+      alert('Failed to delete comment: ' + e.message);
+    }
+  };
+
+  const handleDeleteRep = async (repId) => {
+    if (!confirm('Are you sure you want to delete this rep review?')) return;
+    try {
+      const res = await fetch(`/api/reps/${repId}?user_email=lifegrading@gmail.com`, { method: 'DELETE' });
+      if (res.ok) {
+        setReps(prev => prev.filter(r => r.id !== repId));
+      } else {
+        const d = await res.json();
+        alert(d.error || 'Failed to delete rep');
+      }
+    } catch (e) {
+      alert('Network error: ' + e.message);
+    }
+  };
+
+  const timeAgo = (d) => {
+    if (!d) return '';
+    const diff = Date.now() - new Date(d);
+    const m = Math.floor(diff / 60000);
+    if (m < 60) return m < 1 ? 'just now' : `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
+
+  const filtered = reps.filter(r => {
+    if (filter === 'good' && r.tag !== 'Good') return false;
+    if (filter === 'bad' && r.tag !== 'Bad') return false;
+    const repComments = comments.filter(c => Number(c.rep_id) === Number(r.id));
+    if (filter === 'commented' && repComments.length === 0) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      const matchText = (r.text || '').toLowerCase().includes(q);
+      const matchAuthor = (r.username || '').toLowerCase().includes(q) || (r.user_email || '').toLowerCase().includes(q);
+      return matchText || matchAuthor;
+    }
+    return true;
+  });
+
+  const goodCount = reps.filter(r => r.tag === 'Good').length;
+  const badCount = reps.filter(r => r.tag === 'Bad').length;
+  const totalComments = comments.length;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+            <span style={{ fontSize: 22 }}>⭐</span>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>+Rep Reviews & Moderation</h1>
+          </div>
+          <p style={{ color: colors.textDim, fontSize: 13, margin: 0 }}>
+            Inspect every player review, comment directly under them, and moderate entries.
+          </p>
+        </div>
+        <button
+          onClick={fetchData}
+          style={{
+            cursor: 'pointer', padding: '8px 16px', background: colors.panel,
+            border: '1px solid ' + colors.border, borderRadius: 8, fontSize: 12,
+            color: colors.text, display: 'flex', alignItems: 'center', gap: 6
+          }}
+        >
+          ↻ Refresh
+        </button>
+      </div>
+
+      {/* Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
+        <StatCard label="Total Reviews" value={reps.length} icon="⭐" color={colors.yellow} />
+        <StatCard label="Positive Reps" value={goodCount} icon="👍" color={colors.green} />
+        <StatCard label="Negative Reps" value={badCount} icon="👎" color={colors.red} />
+        <StatCard label="Admin Comments" value={totalComments} icon="💬" color={colors.blue} />
+      </div>
+
+      {/* Filters and search */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[
+            { id: 'all', label: `All (${reps.length})` },
+            { id: 'good', label: `👍 Good (${goodCount})` },
+            { id: 'bad', label: `👎 Bad (${badCount})` },
+            { id: 'commented', label: '💬 Has Comments' },
+          ].map(f => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              style={{
+                padding: '6px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 600,
+                border: filter === f.id ? '1px solid #ef4444' : '1px solid ' + colors.border,
+                background: filter === f.id ? 'rgba(239, 68, 68, 0.12)' : 'transparent',
+                color: filter === f.id ? '#ef4444' : colors.textDim,
+                cursor: 'pointer'
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by username, email, or message..."
+          style={{
+            background: 'rgba(255,255,255,0.03)', border: '1px solid ' + colors.border,
+            borderRadius: 8, padding: '7px 14px', color: colors.text, fontSize: 12.5,
+            width: 280, outline: 'none'
+          }}
+        />
+      </div>
+
+      {/* Reviews list */}
+      {loading ? (
+        <div style={{ color: colors.textDim, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>Loading reviews and comments...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 10, padding: 40, textAlign: 'center', color: colors.textDim, fontSize: 13 }}>
+          No reviews match the selected filter.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {filtered.map(rep => {
+            const repComments = comments.filter(c => Number(c.rep_id) === Number(rep.id));
+            const isSubmitting = !!submittingComment[rep.id];
+            const currentInput = commentInputs[rep.id] || '';
+
+            return (
+              <div
+                key={rep.id}
+                style={{
+                  background: colors.panel, border: '1px solid ' + colors.border,
+                  borderRadius: 12, padding: '20px 22px'
+                }}
+              >
+                {/* Rep Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, fontSize: 15, color: colors.text }}>
+                      {rep.username || rep.user_email?.split('@')[0]}
+                    </span>
+                    <span style={{ fontSize: 12, color: colors.textDim }}>
+                      ({rep.user_email})
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 6,
+                        background: rep.tag === 'Good' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: rep.tag === 'Good' ? colors.green : colors.red,
+                        display: 'flex', alignItems: 'center', gap: 4
+                      }}
+                    >
+                      {rep.tag === 'Good' ? '👍' : '👎'} {rep.tag}
+                    </span>
+                    <span style={{ fontSize: 11, color: '#6b7280' }}>
+                      #{rep.id}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 12, color: colors.textDim }}>
+                      {timeAgo(rep.created_at)}
+                    </span>
+                    <button
+                      onClick={() => handleDeleteRep(rep.id)}
+                      title="Delete this review"
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)',
+                        color: colors.red, fontSize: 11, padding: '4px 8px', borderRadius: 6,
+                        cursor: 'pointer', fontWeight: 600
+                      }}
+                    >
+                      🗑 Delete
+                    </button>
+                  </div>
+                </div>
+
+                {/* Rep Message Text */}
+                <p style={{ fontSize: 14, color: '#e5e7eb', lineHeight: 1.6, margin: '0 0 16px 0', background: 'rgba(255,255,255,0.02)', padding: '12px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+                  {rep.text}
+                </p>
+
+                {/* Comments Section */}
+                <div style={{ borderTop: '1px solid ' + colors.border, paddingTop: 14, marginTop: 14 }}>
+                  <div style={{ fontSize: 12, color: colors.textDim, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>💬</span> Comments ({repComments.length})
+                  </div>
+
+                  {/* List of comments under this rep */}
+                  {repComments.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                      {repComments.map(c => (
+                        <div
+                          key={c.id}
+                          style={{
+                            background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)',
+                            borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between',
+                            alignItems: 'flex-start'
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                              <span style={{ fontSize: 11, background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', padding: '1px 7px', borderRadius: 4, fontWeight: 700 }}>
+                                🛡 {c.author_name || 'Admin'}
+                              </span>
+                              <span style={{ fontSize: 11, color: colors.textDim }}>
+                                {c.author_email} · {timeAgo(c.created_at)}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 13, color: colors.text, lineHeight: 1.5 }}>
+                              {c.text}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteComment(c.id)}
+                            style={{
+                              background: 'transparent', border: 'none', color: colors.textDim,
+                              cursor: 'pointer', fontSize: 12, padding: '2px 6px'
+                            }}
+                            title="Delete comment"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add comment input under this rep */}
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <input
+                      type="text"
+                      value={currentInput}
+                      onChange={e => setCommentInputs(prev => ({ ...prev, [rep.id]: e.target.value }))}
+                      onKeyDown={e => e.key === 'Enter' && handleAddComment(rep.id)}
+                      placeholder="Comment under this rep as Admin..."
+                      style={{
+                        flex: 1, background: 'rgba(255,255,255,0.03)', border: '1px solid ' + colors.border,
+                        borderRadius: 8, padding: '9px 14px', color: colors.text, fontSize: 13, outline: 'none'
+                      }}
+                    />
+                    <button
+                      onClick={() => handleAddComment(rep.id)}
+                      disabled={!currentInput.trim() || isSubmitting}
+                      style={{
+                        padding: '9px 18px', background: currentInput.trim() && !isSubmitting ? colors.blue : 'rgba(255,255,255,0.05)',
+                        color: currentInput.trim() && !isSubmitting ? '#fff' : colors.textDim,
+                        border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                        cursor: currentInput.trim() && !isSubmitting ? 'pointer' : 'not-allowed',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {isSubmitting ? 'Posting...' : 'Comment'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Section: PayPal Purchases ────────────────────────────────────────────────
+function PurchasesAdminView() {
+  const [purchases, setPurchases] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newPurchase, setNewPurchase] = useState({
+    user_email: '',
+    amount: '9.99',
+    plan_name: 'Ultimate Grabs Pro (Monthly)',
+    subscription_id: '',
+    status: 'ACTIVE'
+  });
+  const [saving, setSaving] = useState(false);
+
+  const fetchPurchases = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/purchases');
+      const data = await res.json();
+      setPurchases(data.purchases || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPurchases();
+  }, []);
+
+  const handleAddPurchase = async () => {
+    if (!newPurchase.user_email.trim()) {
+      alert('User email is required');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch('/api/admin/purchases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newPurchase)
+      });
+      const data = await res.json();
+      if (res.ok && data.purchase) {
+        setPurchases(prev => [data.purchase, ...prev]);
+        setShowAddModal(false);
+        setNewPurchase({
+          user_email: '',
+          amount: '9.99',
+          plan_name: 'Ultimate Grabs Pro (Monthly)',
+          subscription_id: '',
+          status: 'ACTIVE'
+        });
+      } else {
+        alert(data.error || 'Failed to add purchase');
+      }
+    } catch (e) {
+      alert('Network error: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeletePurchase = async (id) => {
+    if (!confirm('Are you sure you want to remove this purchase record?')) return;
+    try {
+      const res = await fetch(`/api/admin/purchases?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (res.ok) {
+        setPurchases(prev => prev.filter(p => p.id !== id));
+      }
+    } catch (e) {
+      alert('Failed to delete purchase: ' + e.message);
+    }
+  };
+
+  const filtered = purchases.filter(p => {
+    if (filter === 'active' && p.status !== 'ACTIVE') return false;
+    if (filter === 'expired' && p.status !== 'EXPIRED') return false;
+    if (filter === 'cancelled' && p.status !== 'CANCELLED') return false;
+    if (filter === 'standard' && p.amount !== '9.99') return false;
+    if (filter === 'discounted' && p.amount !== '4.99') return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      const matchEmail = (p.user_email || '').toLowerCase().includes(q) || (p.payer_email || '').toLowerCase().includes(q);
+      const matchId = (p.subscription_id || '').toLowerCase().includes(q);
+      const matchPlan = (p.plan_name || '').toLowerCase().includes(q);
+      return matchEmail || matchId || matchPlan;
+    }
+    return true;
+  });
+
+  const activeCount = purchases.filter(p => p.status === 'ACTIVE').length;
+  const totalRevenue = purchases.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0).toFixed(2);
+  const promoCount = purchases.filter(p => p.amount === '4.99').length;
+
+  const fmtDate = (d) => {
+    if (!d) return '—';
+    try {
+      return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return d;
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+            <span style={{ fontSize: 22 }}>💰</span>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>PayPal Purchases</h1>
+          </div>
+          <p style={{ color: colors.textDim, fontSize: 13, margin: 0 }}>
+            List of all PayPal transactions, subscriptions, and active Pro memberships.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => setShowAddModal(true)}
+            style={{
+              cursor: 'pointer', padding: '8px 16px', background: colors.green,
+              border: 'none', borderRadius: 8, fontSize: 12.5, fontWeight: 700,
+              color: '#000', display: 'flex', alignItems: 'center', gap: 6
+            }}
+          >
+            + Record PayPal Purchase
+          </button>
+          <button
+            onClick={fetchPurchases}
+            style={{
+              cursor: 'pointer', padding: '8px 16px', background: colors.panel,
+              border: '1px solid ' + colors.border, borderRadius: 8, fontSize: 12,
+              color: colors.text, display: 'flex', alignItems: 'center', gap: 6
+            }}
+          >
+            ↻ Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
+        <StatCard label="Total Transactions" value={purchases.length} icon="🧾" color={colors.blue} />
+        <StatCard label="Active Subscriptions" value={activeCount} icon="👑" color={colors.green} />
+        <StatCard label="Est. Revenue (USD)" value={`$${totalRevenue}`} icon="💵" color={colors.yellow} />
+        <StatCard label="Promo Purchases ($4.99)" value={promoCount} icon="🏷️" color={colors.purple} />
+      </div>
+
+      {/* Filter and search bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[
+            { id: 'all', label: `All (${purchases.length})` },
+            { id: 'active', label: `Active (${activeCount})` },
+            { id: 'standard', label: 'Standard ($9.99)' },
+            { id: 'discounted', label: 'Promo ($4.99)' },
+            { id: 'cancelled', label: 'Cancelled' },
+          ].map(f => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              style={{
+                padding: '6px 14px', borderRadius: 8, fontSize: 12.5, fontWeight: 600,
+                border: filter === f.id ? '1px solid #22c55e' : '1px solid ' + colors.border,
+                background: filter === f.id ? 'rgba(34, 197, 94, 0.12)' : 'transparent',
+                color: filter === f.id ? colors.green : colors.textDim,
+                cursor: 'pointer'
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by customer email, plan, or ID..."
+          style={{
+            background: 'rgba(255,255,255,0.03)', border: '1px solid ' + colors.border,
+            borderRadius: 8, padding: '7px 14px', color: colors.text, fontSize: 12.5,
+            width: 300, outline: 'none'
+          }}
+        />
+      </div>
+
+      {/* Purchases Table */}
+      <div style={{ background: colors.panel, border: '1px solid ' + colors.border, borderRadius: 10, overflow: 'hidden' }}>
+        {loading ? (
+          <div style={{ color: colors.textDim, fontSize: 13, padding: 40, textAlign: 'center' }}>Loading PayPal purchases...</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ color: colors.textDim, fontSize: 13, padding: 40, textAlign: 'center' }}>No PayPal purchases found.</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid ' + colors.border, background: 'rgba(255,255,255,0.02)' }}>
+                <th style={{ padding: '12px 18px', color: colors.textDim, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Customer</th>
+                <th style={{ padding: '12px 18px', color: colors.textDim, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Plan & Amount</th>
+                <th style={{ padding: '12px 18px', color: colors.textDim, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Subscription / Order ID</th>
+                <th style={{ padding: '12px 18px', color: colors.textDim, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Status</th>
+                <th style={{ padding: '12px 18px', color: colors.textDim, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Purchased At</th>
+                <th style={{ padding: '12px 18px', color: colors.textDim, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Expires / Renews</th>
+                <th style={{ padding: '12px 18px', color: colors.textDim, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(p => (
+                <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <td style={{ padding: '14px 18px' }}>
+                    <div style={{ fontWeight: 600, color: colors.text }}>{p.user_email}</div>
+                    {p.payer_name && p.payer_name !== p.user_email && (
+                      <div style={{ fontSize: 11, color: colors.textDim }}>{p.payer_name}</div>
+                    )}
+                  </td>
+                  <td style={{ padding: '14px 18px' }}>
+                    <div style={{ color: colors.text, fontWeight: 600 }}>${p.amount} / mo</div>
+                    <div style={{ fontSize: 11, color: colors.textDim }}>{p.plan_name}</div>
+                  </td>
+                  <td style={{ padding: '14px 18px' }}>
+                    <div style={{ fontFamily: 'monospace', fontSize: 12, color: '#93c5fd' }}>{p.subscription_id}</div>
+                    <div style={{ fontSize: 10, color: colors.textDim }}>Gateway: PayPal</div>
+                  </td>
+                  <td style={{ padding: '14px 18px' }}>
+                    <span
+                      style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
+                        background: p.status === 'ACTIVE' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: p.status === 'ACTIVE' ? colors.green : colors.red
+                      }}
+                    >
+                      {p.status}
+                    </span>
+                  </td>
+                  <td style={{ padding: '14px 18px', color: colors.textDim, fontSize: 12 }}>
+                    {fmtDate(p.created_at)}
+                  </td>
+                  <td style={{ padding: '14px 18px', color: colors.textDim, fontSize: 12 }}>
+                    {fmtDate(p.expires_at)}
+                  </td>
+                  <td style={{ padding: '14px 18px' }}>
+                    <button
+                      onClick={() => handleDeletePurchase(p.id)}
+                      style={{
+                        background: 'transparent', border: '1px solid rgba(239,68,68,0.3)',
+                        color: colors.red, fontSize: 11, padding: '3px 8px', borderRadius: 4,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Modal to record manual purchase */}
+      {showAddModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
+          <div style={{ background: '#111218', border: '1px solid #2a2d38', borderRadius: 16, padding: 36, width: 440, position: 'relative' }}>
+            <button onClick={() => setShowAddModal(false)} style={{ position: 'absolute', top: 14, right: 16, background: 'none', border: 'none', color: colors.textDim, fontSize: 20, cursor: 'pointer' }}>✕</button>
+            <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 20px' }}>Record PayPal Purchase</h2>
+            
+            <div style={{ fontSize: 11, color: colors.textDim, textTransform: 'uppercase', marginBottom: 6, fontWeight: 600 }}>Customer Email</div>
+            <input
+              type="email"
+              value={newPurchase.user_email}
+              onChange={e => setNewPurchase(p => ({ ...p, user_email: e.target.value }))}
+              placeholder="e.g. user@gmail.com"
+              style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', marginBottom: 14, boxSizing: 'border-box' }}
+            />
+
+            <div style={{ fontSize: 11, color: colors.textDim, textTransform: 'uppercase', marginBottom: 6, fontWeight: 600 }}>Amount</div>
+            <select
+              value={newPurchase.amount}
+              onChange={e => setNewPurchase(p => ({
+                ...p,
+                amount: e.target.value,
+                plan_name: e.target.value === '4.99' ? 'Ultimate Grabs Pro (50% Promo)' : 'Ultimate Grabs Pro (Monthly)'
+              }))}
+              style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', marginBottom: 14, boxSizing: 'border-box' }}
+            >
+              <option value="9.99" style={{ background: '#111218' }}>$9.99 / mo (Standard Plan)</option>
+              <option value="4.99" style={{ background: '#111218' }}>$4.99 / mo (Discounted Plan)</option>
+            </select>
+
+            <div style={{ fontSize: 11, color: colors.textDim, textTransform: 'uppercase', marginBottom: 6, fontWeight: 600 }}>PayPal Subscription ID (optional)</div>
+            <input
+              type="text"
+              value={newPurchase.subscription_id}
+              onChange={e => setNewPurchase(p => ({ ...p, subscription_id: e.target.value }))}
+              placeholder="e.g. I-BW452C11B02 (auto-generated if empty)"
+              style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', marginBottom: 20, boxSizing: 'border-box' }}
+            />
+
+            <button
+              onClick={handleAddPurchase}
+              disabled={!newPurchase.user_email.trim() || saving}
+              style={{
+                width: '100%', padding: '12px', background: newPurchase.user_email.trim() && !saving ? colors.green : '#333',
+                color: '#000', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700,
+                cursor: newPurchase.user_email.trim() && !saving ? 'pointer' : 'not-allowed'
+              }}
+            >
+              {saving ? 'Saving...' : 'Save & Grant Pro'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main AdminPage ───────────────────────────────────────────────────────────
 export default function AdminPage() {
   const router = useRouter();
@@ -743,7 +1393,7 @@ export default function AdminPage() {
     fetch('/api/auth/user')
       .then(r => r.json())
       .then(d => {
-        if (!d.user || d.user.email?.toLowerCase().trim() !== 'lifegrading@gmail.com') {
+        if (!d.user || !ADMIN_EMAILS.includes(d.user.email?.toLowerCase().trim())) {
           setError('Unauthorized');
           setLoading(false);
           setAuthChecked(true);
@@ -888,9 +1538,9 @@ export default function AdminPage() {
       case 'grabs': return <GrabsView />;
       case 'updates': return <UpdatesAdminView />;
       case 'abuse': return <AbuseRiskView users={users} />;
-      case 'rep': return <PlaceholderView icon="⭐" title="+Rep" subtitle="Review and moderate reputation entries." />;
+      case 'rep': return <RepsAdminView />;
       case 'capture-api': return <PlaceholderView icon="🌐" title="Capture API" subtitle="Manage capture API endpoints and submissions." />;
-      case 'purchases': return <PlaceholderView icon="💰" title="Purchases" subtitle="Transaction and purchase history." />;
+      case 'purchases': return <PurchasesAdminView />;
       case 'crypto': return <PlaceholderView icon="₿" title="Crypto" subtitle="Cryptocurrency payment management." />;
       default: return <HomeView users={users} />;
     }

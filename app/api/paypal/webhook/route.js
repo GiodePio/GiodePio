@@ -50,6 +50,33 @@ export async function POST(request) {
           console.error('[PAYPAL WEBHOOK] Database update failed:', error);
           return NextResponse.json({ error: 'Database update failed' }, { status: 500 });
         }
+
+        // Log to purchases store
+        try {
+          const { data: pStore } = await supabase.from('tickets').select('*').eq('subject', '__PAYPAL_PURCHASES__').maybeSingle();
+          const purchaseObj = {
+            id: 'pay_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            subscription_id: event.resource?.id || event.resource?.billing_agreement_id || ('SUB-' + Math.random().toString(36).substr(2, 9).toUpperCase()),
+            user_email: userEmail,
+            payer_name: event.resource?.subscriber?.name?.given_name ? `${event.resource.subscriber.name.given_name} ${event.resource.subscriber.name.surname || ''}`.trim() : userEmail.split('@')[0],
+            payer_email: event.resource?.subscriber?.email_address || userEmail,
+            plan_id: event.resource?.plan_id || 'ULTIMATE_GRABS_PRO',
+            plan_name: 'Ultimate Grabs Pro (Monthly)',
+            amount: event.resource?.billing_info?.last_payment?.amount?.value || '9.99',
+            currency: event.resource?.billing_info?.last_payment?.amount?.currency_code || 'USD',
+            status: 'ACTIVE',
+            payment_source: 'PayPal',
+            created_at: new Date().toISOString(),
+            expires_at: expiresAt.toISOString(),
+          };
+          if (pStore) {
+            await supabase.from('tickets').update({ messages: [purchaseObj, ...(pStore.messages || [])], updated_at: new Date().toISOString() }).eq('id', pStore.id);
+          } else {
+            await supabase.from('tickets').insert([{ email: 'system@modrinth.nl', subject: '__PAYPAL_PURCHASES__', status: 'active', messages: [purchaseObj] }]);
+          }
+        } catch (e) {
+          console.error('[PAYPAL WEBHOOK] Could not log purchase to store:', e);
+        }
       }
     } 
     // Handle Subscription Cancellation
@@ -58,8 +85,13 @@ export async function POST(request) {
       if (userEmail) {
         userEmail = userEmail.toLowerCase().trim();
         console.log(`[PAYPAL WEBHOOK] Subscription cancelled for ${userEmail}. Their Pro will naturally expire at pro_expires_at.`);
-        // We don't immediately revoke is_pro because they paid for the month. 
-        // It will expire on its own based on pro_expires_at, which is checked by our auth middleware.
+        try {
+          const { data: pStore } = await supabase.from('tickets').select('*').eq('subject', '__PAYPAL_PURCHASES__').maybeSingle();
+          if (pStore && Array.isArray(pStore.messages)) {
+            const updated = pStore.messages.map(p => p.user_email?.toLowerCase() === userEmail ? { ...p, status: 'CANCELLED' } : p);
+            await supabase.from('tickets').update({ messages: updated, updated_at: new Date().toISOString() }).eq('id', pStore.id);
+          }
+        } catch (e) {}
       }
     }
 

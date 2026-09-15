@@ -21,7 +21,28 @@ export async function GET() {
   if (error) {
     return NextResponse.json({ reps: [], error: error.message });
   }
-  return NextResponse.json({ reps: data || [] });
+
+  try {
+    const { data: store } = await supabase
+      .from('tickets')
+      .select('messages')
+      .eq('subject', '__REP_COMMENTS__')
+      .maybeSingle();
+
+    const comments = store?.messages || [];
+    const repsWithComments = (data || []).map(r => {
+      const repComments = comments.filter(c => c.rep_id === r.id);
+      return {
+        ...r,
+        comments: repComments,
+        owner_reply: repComments.length > 0 ? repComments[repComments.length - 1].text : r.owner_reply,
+        reply_at: repComments.length > 0 ? repComments[repComments.length - 1].created_at : r.reply_at
+      };
+    });
+    return NextResponse.json({ reps: repsWithComments });
+  } catch (e) {
+    return NextResponse.json({ reps: data || [] });
+  }
 }
 
 export async function POST(request) {
