@@ -1072,9 +1072,14 @@ function PurchasesAdminView() {
     amount: '9.99',
     plan_name: 'Ultimate Grabs Pro (Monthly)',
     subscription_id: '',
+    description: '',
     status: 'ACTIVE'
   });
   const [saving, setSaving] = useState(false);
+
+  const [editingDescriptionFor, setEditingDescriptionFor] = useState(null);
+  const [editDescriptionText, setEditDescriptionText] = useState('');
+  const [savingDescription, setSavingDescription] = useState(false);
 
   const fetchPurchases = async () => {
     setLoading(true);
@@ -1114,6 +1119,7 @@ function PurchasesAdminView() {
           amount: '9.99',
           plan_name: 'Ultimate Grabs Pro (Monthly)',
           subscription_id: '',
+          description: '',
           status: 'ACTIVE'
         });
       } else {
@@ -1123,6 +1129,39 @@ function PurchasesAdminView() {
       alert('Network error: ' + e.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveDescription = async () => {
+    if (!editingDescriptionFor) return;
+    setSavingDescription(true);
+    try {
+      const res = await fetch('/api/admin/purchases', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingDescriptionFor.id,
+          user_email: editingDescriptionFor.user_email,
+          description: editDescriptionText
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.purchase) {
+        setPurchases(prev => prev.map(p => {
+          if (p.id === editingDescriptionFor.id || (p.user_email && p.user_email.toLowerCase().trim() === editingDescriptionFor.user_email?.toLowerCase().trim())) {
+            return { ...p, description: data.purchase.description };
+          }
+          return p;
+        }));
+        setEditingDescriptionFor(null);
+        setEditDescriptionText('');
+      } else {
+        alert(data.error || 'Failed to update description');
+      }
+    } catch (e) {
+      alert('Network error: ' + e.message);
+    } finally {
+      setSavingDescription(false);
     }
   };
 
@@ -1149,7 +1188,8 @@ function PurchasesAdminView() {
       const matchEmail = (p.user_email || '').toLowerCase().includes(q) || (p.payer_email || '').toLowerCase().includes(q);
       const matchId = (p.subscription_id || '').toLowerCase().includes(q);
       const matchPlan = (p.plan_name || '').toLowerCase().includes(q);
-      return matchEmail || matchId || matchPlan;
+      const matchDesc = (p.description || '').toLowerCase().includes(q);
+      return matchEmail || matchId || matchPlan || matchDesc;
     }
     return true;
   });
@@ -1271,21 +1311,53 @@ function PurchasesAdminView() {
             <tbody>
               {filtered.map(p => (
                 <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <td style={{ padding: '14px 18px' }}>
+                  <td style={{ padding: '14px 18px', verticalAlign: 'top' }}>
                     <div style={{ fontWeight: 600, color: colors.text }}>{p.user_email}</div>
                     {p.payer_name && p.payer_name !== p.user_email && (
                       <div style={{ fontSize: 11, color: colors.textDim }}>{p.payer_name}</div>
                     )}
+                    {p.description ? (
+                      <div
+                        onClick={() => {
+                          setEditingDescriptionFor(p);
+                          setEditDescriptionText(p.description || '');
+                        }}
+                        title="Click to edit information / description"
+                        style={{
+                          marginTop: 6, display: 'inline-flex', alignItems: 'flex-start', gap: 5,
+                          background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)',
+                          borderRadius: 6, padding: '4px 8px', fontSize: 11.5, color: '#bfdbfe',
+                          cursor: 'pointer', maxWidth: 280, wordBreak: 'break-word', lineHeight: 1.4
+                        }}
+                      >
+                        <span style={{ fontSize: 11, flexShrink: 0 }}>📝</span>
+                        <span>{p.description}</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setEditingDescriptionFor(p);
+                          setEditDescriptionText('');
+                        }}
+                        style={{
+                          marginTop: 6, background: 'transparent', border: '1px dashed rgba(255,255,255,0.15)',
+                          color: colors.textDim, fontSize: 11, padding: '2px 7px', borderRadius: 4,
+                          cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4
+                        }}
+                      >
+                        <span>+</span> Add info / note
+                      </button>
+                    )}
                   </td>
-                  <td style={{ padding: '14px 18px' }}>
+                  <td style={{ padding: '14px 18px', verticalAlign: 'top' }}>
                     <div style={{ color: colors.text, fontWeight: 600 }}>${p.amount} / mo</div>
                     <div style={{ fontSize: 11, color: colors.textDim }}>{p.plan_name}</div>
                   </td>
-                  <td style={{ padding: '14px 18px' }}>
+                  <td style={{ padding: '14px 18px', verticalAlign: 'top' }}>
                     <div style={{ fontFamily: 'monospace', fontSize: 12, color: '#93c5fd' }}>{p.subscription_id}</div>
                     <div style={{ fontSize: 10, color: colors.textDim }}>Gateway: PayPal</div>
                   </td>
-                  <td style={{ padding: '14px 18px' }}>
+                  <td style={{ padding: '14px 18px', verticalAlign: 'top' }}>
                     <span
                       style={{
                         fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6,
@@ -1296,23 +1368,39 @@ function PurchasesAdminView() {
                       {p.status}
                     </span>
                   </td>
-                  <td style={{ padding: '14px 18px', color: colors.textDim, fontSize: 12 }}>
+                  <td style={{ padding: '14px 18px', color: colors.textDim, fontSize: 12, verticalAlign: 'top' }}>
                     {fmtDate(p.created_at)}
                   </td>
-                  <td style={{ padding: '14px 18px', color: colors.textDim, fontSize: 12 }}>
+                  <td style={{ padding: '14px 18px', color: colors.textDim, fontSize: 12, verticalAlign: 'top' }}>
                     {fmtDate(p.expires_at)}
                   </td>
-                  <td style={{ padding: '14px 18px' }}>
-                    <button
-                      onClick={() => handleDeletePurchase(p.id, p.user_email)}
-                      style={{
-                        background: 'transparent', border: '1px solid rgba(239,68,68,0.3)',
-                        color: colors.red, fontSize: 11, padding: '3px 8px', borderRadius: 4,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Delete
-                    </button>
+                  <td style={{ padding: '14px 18px', verticalAlign: 'top' }}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <button
+                        onClick={() => {
+                          setEditingDescriptionFor(p);
+                          setEditDescriptionText(p.description || '');
+                        }}
+                        style={{
+                          background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)',
+                          color: '#93c5fa', fontSize: 11, padding: '3px 8px', borderRadius: 4,
+                          cursor: 'pointer'
+                        }}
+                        title="Add or edit information/description"
+                      >
+                        {p.description ? 'Edit Note' : '+ Note'}
+                      </button>
+                      <button
+                        onClick={() => handleDeletePurchase(p.id, p.user_email)}
+                        style={{
+                          background: 'transparent', border: '1px solid rgba(239,68,68,0.3)',
+                          color: colors.red, fontSize: 11, padding: '3px 8px', borderRadius: 4,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1357,7 +1445,16 @@ function PurchasesAdminView() {
               value={newPurchase.subscription_id}
               onChange={e => setNewPurchase(p => ({ ...p, subscription_id: e.target.value }))}
               placeholder="e.g. I-BW452C11B02 (auto-generated if empty)"
-              style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', marginBottom: 20, boxSizing: 'border-box' }}
+              style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', marginBottom: 14, boxSizing: 'border-box' }}
+            />
+
+            <div style={{ fontSize: 11, color: colors.textDim, textTransform: 'uppercase', marginBottom: 6, fontWeight: 600 }}>Description / Information (optional)</div>
+            <textarea
+              value={newPurchase.description || ''}
+              onChange={e => setNewPurchase(p => ({ ...p, description: e.target.value }))}
+              placeholder="e.g. Paid via crypto, Discord: @user, custom duration, etc."
+              rows={3}
+              style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', marginBottom: 20, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
             />
 
             <button
@@ -1371,6 +1468,68 @@ function PurchasesAdminView() {
             >
               {saving ? 'Saving...' : 'Save & Grant Pro'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal to edit description / info */}
+      {editingDescriptionFor && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
+          <div style={{ background: '#111218', border: '1px solid #2a2d38', borderRadius: 16, padding: 32, width: 460, position: 'relative' }}>
+            <button
+              onClick={() => {
+                setEditingDescriptionFor(null);
+                setEditDescriptionText('');
+              }}
+              style={{ position: 'absolute', top: 14, right: 16, background: 'none', border: 'none', color: colors.textDim, fontSize: 20, cursor: 'pointer' }}
+            >
+              ✕
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <span style={{ fontSize: 20 }}>📝</span>
+              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Purchase Information & Notes</h2>
+            </div>
+            <div style={{ fontSize: 12, color: colors.textDim, marginBottom: 18 }}>
+              Add extra details or notes for <span style={{ color: '#fff', fontWeight: 600 }}>{editingDescriptionFor.user_email}</span>
+            </div>
+
+            <div style={{ fontSize: 11, color: colors.textDim, textTransform: 'uppercase', marginBottom: 6, fontWeight: 600 }}>Description / Information</div>
+            <textarea
+              value={editDescriptionText}
+              onChange={e => setEditDescriptionText(e.target.value)}
+              placeholder="e.g. Paid via crypto / manual invoice #41, customer requested custom limit, Discord: @user..."
+              rows={4}
+              style={{
+                width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none',
+                marginBottom: 20, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit'
+              }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                onClick={() => {
+                  setEditingDescriptionFor(null);
+                  setEditDescriptionText('');
+                }}
+                style={{
+                  padding: '9px 16px', background: 'transparent', border: '1px solid ' + colors.border,
+                  borderRadius: 8, color: colors.textDim, fontSize: 13, cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveDescription}
+                disabled={savingDescription}
+                style={{
+                  padding: '9px 18px', background: colors.green, color: '#000', border: 'none',
+                  borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: savingDescription ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {savingDescription ? 'Saving...' : 'Save Info'}
+              </button>
+            </div>
           </div>
         </div>
       )}

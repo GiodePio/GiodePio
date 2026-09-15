@@ -123,6 +123,7 @@ export async function GET(request) {
             currency: 'USD',
             status: p.is_pro ? 'ACTIVE' : 'EXPIRED',
             payment_source: 'PayPal',
+            description: '',
             created_at: p.updated_at || new Date().toISOString(),
             expires_at: p.pro_expires_at || null
           });
@@ -143,7 +144,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { user_email, subscription_id, amount, plan_name, status, payer_name, payer_email } = body;
+    const { user_email, subscription_id, amount, plan_name, status, payer_name, payer_email, description } = body;
 
     if (!user_email) {
       return NextResponse.json({ error: 'user_email is required' }, { status: 400 });
@@ -183,6 +184,7 @@ export async function POST(request) {
       currency: body.currency || 'USD',
       status: status || 'ACTIVE',
       payment_source: 'PayPal',
+      description: (description || '').trim(),
       created_at: new Date().toISOString(),
       expires_at: expiresAt.toISOString(),
     };
@@ -261,3 +263,78 @@ export async function DELETE(request) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+export async function PATCH(request) {
+  try {
+    const body = await request.json();
+    const { id, user_email, description } = body;
+
+    if (!id && !user_email) {
+      return NextResponse.json({ error: 'Purchase ID or user_email is required' }, { status: 400 });
+    }
+
+    const supabase = getClient();
+    const store = await getPurchasesStore(supabase);
+    const existingList = store?.messages || [];
+
+    const emailLower = (user_email || '').toLowerCase().trim();
+    let found = false;
+    let updatedPurchase = null;
+
+    const descValue = description !== undefined ? String(description).trim() : '';
+
+    const updatedMessages = existingList.map(p => {
+      if ((id && p.id === id) || (emailLower && p.user_email?.toLowerCase().trim() === emailLower)) {
+        found = true;
+        updatedPurchase = {
+          ...p,
+          description: descValue,
+          updated_at: new Date().toISOString()
+        };
+        return updatedPurchase;
+      }
+      return p;
+    });
+
+    if (!found) {
+      // If the purchase was synthesized from pro_users, promote it into recorded purchases with description
+      const userEmail = emailLower || (id && id.startsWith('pro_') ? id.replace('pro_', '') : '');
+      const { data: proUser } = await supabase
+        .from('pro_users')
+        .select('*')
+        .eq('email', userEmail)
+        .maybeSingle();
+
+      const createdItem = {
+        id: id || ('pay_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5)),
+        subscription_id: 'SUB-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+        user_email: userEmail,
+        payer_name: userEmail.split('@')[0],
+        payer_email: userEmail,
+        plan_id: 'ULTIMATE_GRABS_PRO',
+        plan_name: 'Ultimate Grabs Pro (Monthly)',
+        amount: '9.99',
+        currency: 'USD',
+        status: proUser?.is_pro ? 'ACTIVE' : 'EXPIRED',
+        payment_source: 'PayPal',
+        description: descValue,
+        created_at: proUser?.updated_at || new Date().toISOString(),
+        expires_at: proUser?.pro_expires_at || null,
+        updated_at: new Date().toISOString()
+      };
+
+      updatedMessages.unshift(createdItem);
+      updatedPurchase = createdItem;
+    }
+
+    await supabase
+      .from('tickets')
+      .update({ messages: updatedMessages, updated_at: new Date().toISOString() })
+      .eq('id', store.id);
+
+    return NextResponse.json({ ok: true, purchase: updatedPurchase });
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
