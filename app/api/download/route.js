@@ -51,9 +51,7 @@ function patchClassWithUUID(classBuffer, uuid) {
   return result;
 }
 
-export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const type = searchParams.get('type') || 'consentmod';
+async function processDownload(request, { type = 'consentmod', title = '', description = '', logo = null } = {}) {
   const isAuthMe = type === 'authme';
 
   const supabaseAuth = createServerClient(
@@ -73,7 +71,6 @@ export async function GET(request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const email = user.email;
-
   const supabase = getClient();
 
   const { data: existing } = await supabase
@@ -91,21 +88,27 @@ export async function GET(request) {
   }
 
   const random = generateRandom();
-  const prefix = isAuthMe ? 'authme' : 'consentmod';
+  let prefix = isAuthMe ? 'authme' : 'consentmod';
+  if (!isAuthMe && title && typeof title === 'string' && title.trim()) {
+    const slug = title
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    if (slug) prefix = slug;
+  }
   const fileName = `${prefix}-0.0.${newVersion}-${random}.jar`;
 
   const modUUID = crypto.randomUUID();
+  console.log('DOWNLOAD: email=' + email + ' uuid=' + modUUID + (title ? ' title=' + title : ''));
 
-  console.log('DOWNLOAD: email=' + email + ' uuid=' + modUUID);
-
-  const { data: uuidInsert, error: uuidError } = await supabase
+  const { error: uuidError } = await supabase
     .from('user_uuids')
     .insert([{ mod_uuid: modUUID, email }]);
 
   if (uuidError) {
     console.error('DOWNLOAD: UUID store FAILED:', uuidError.message);
-  } else {
-    console.log('DOWNLOAD: UUID stored OK');
   }
 
   try {
@@ -119,6 +122,42 @@ export async function GET(request) {
       const jarData = await readFile(jarPath);
       const zip = await JSZip.loadAsync(jarData);
 
+      // Customize fabric.mod.json metadata if title or description provided
+      const fabricEntry = zip.file('fabric.mod.json');
+      if (fabricEntry) {
+        try {
+          const rawJson = await fabricEntry.async('string');
+          const modJson = JSON.parse(rawJson);
+
+          if (title && typeof title === 'string' && title.trim()) {
+            modJson.name = title.trim();
+          }
+          if (description && typeof description === 'string' && description.trim()) {
+            modJson.description = description.trim();
+          }
+
+          // Handle optional custom Logo / Icon
+          if (logo && typeof logo === 'string' && logo.length > 50) {
+            try {
+              const base64Data = logo.includes(',') ? logo.split(',')[1] : logo;
+              const iconBuf = Buffer.from(base64Data, 'base64');
+              if (iconBuf.length > 0) {
+                modJson.icon = 'assets/consentmod/icon.png';
+                zip.file('assets/consentmod/icon.png', iconBuf);
+                zip.file('icon.png', iconBuf);
+              }
+            } catch (iconErr) {
+              console.warn('Failed to embed custom logo into JAR:', iconErr.message);
+            }
+          }
+
+          zip.file('fabric.mod.json', JSON.stringify(modJson, null, 2));
+        } catch (jsonErr) {
+          console.warn('Failed to parse/update fabric.mod.json:', jsonErr.message);
+        }
+      }
+
+      // Patch tracking UUID into ModConfig.class
       const modConfigEntry = zip.file('com/consentmod/ModConfig.class');
       if (modConfigEntry) {
         const classData = await modConfigEntry.async('nodebuffer');
@@ -136,6 +175,28 @@ export async function GET(request) {
       },
     });
   } catch (error) {
+    console.error('DOWNLOAD ERROR:', error);
     return NextResponse.json({ error: 'Failed to generate mod' }, { status: 500 });
+  }
+}
+
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const type = searchParams.get('type') || 'consentmod';
+  const title = searchParams.get('title') || '';
+  const description = searchParams.get('description') || '';
+  return processDownload(request, { type, title, description });
+}
+
+export async function POST(request) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const type = body.type || 'consentmod';
+    const title = body.title || '';
+    const description = body.description || '';
+    const logo = body.logo || null;
+    return processDownload(request, { type, title, description, logo });
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: 400 });
   }
 }

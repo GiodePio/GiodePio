@@ -13,6 +13,8 @@ const colors = {
   green: '#22c55e',
 };
 
+const ADMIN_EMAILS = ['lifegrading@gmail.com', 'giodewaard152@gmail.com'];
+
 const BUILD_STEPS = [
   { label: 'Queuing runner...', duration: 600 },
   { label: 'Setting environment...', duration: 800 },
@@ -38,6 +40,13 @@ export default function BuildPage() {
   const [trialExhausted, setTrialExhausted] = useState(false);
   const [proChecked, setProChecked] = useState(false);
 
+  // Optional Consent Mod customization modal states
+  const [showCustomModal, setShowCustomModal] = useState(false);
+  const [customTitle, setCustomTitle] = useState('');
+  const [customDescription, setCustomDescription] = useState('');
+  const [customLogo, setCustomLogo] = useState(null);
+  const [customLogoPreview, setCustomLogoPreview] = useState('');
+
   useEffect(() => {
     fetch('/api/auth/user')
       .then(r => r.json())
@@ -46,7 +55,7 @@ export default function BuildPage() {
           setUserEmail(d.user.email);
           setEmail(d.user.email);
           setEmailConfirmed(true);
-          if (d.user.email.toLowerCase() === 'lifegrading@gmail.com') {
+          if (ADMIN_EMAILS.includes(d.user.email.toLowerCase())) {
             setIsPro(true);
             setProChecked(true);
           } else {
@@ -71,14 +80,47 @@ export default function BuildPage() {
     if (email && email.includes('@')) setEmailConfirmed(true);
   };
 
-  const handleDownload = async (type = 'consentmod') => {
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file (PNG, JPG, WebP)');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const result = evt.target?.result;
+      setCustomLogo(result);
+      setCustomLogoPreview(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    setCustomLogo(null);
+    setCustomLogoPreview('');
+  };
+
+  const handleDownload = async (type = 'consentmod', customData = null) => {
     if (!emailConfirmed || !email) return;
     setDownloading(true);
     setBuildStep(0);
     setBuildDone(false);
 
     let stepIndex = 0;
-    const apiPromise = fetch(`/api/download?email=${encodeURIComponent(email)}&type=${type}`);
+    const apiPromise = (type === 'consentmod' && customData)
+      ? fetch('/api/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            type,
+            title: customData.title || '',
+            description: customData.description || '',
+            logo: customData.logo || null,
+          }),
+        })
+      : fetch(`/api/download?email=${encodeURIComponent(email)}&type=${type}`);
 
     const runSteps = async () => {
       for (let i = 0; i < BUILD_STEPS.length; i++) {
@@ -179,7 +221,10 @@ export default function BuildPage() {
                 </div>
               </div>
               <button
-                onClick={() => handleDownload('consentmod')}
+                onClick={() => {
+                  if (!emailConfirmed || downloading) return;
+                  setShowCustomModal(true);
+                }}
                 disabled={!emailConfirmed || downloading}
                 className="btn-smooth"
                 style={{ background: 'transparent', border: `1px solid ${emailConfirmed && !downloading ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`, color: emailConfirmed && !downloading ? colors.text : '#555', padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: emailConfirmed && !downloading ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 8 }}
@@ -233,6 +278,118 @@ export default function BuildPage() {
           </div>
         </div>
       </div>
+
+      {/* Optional Customization Modal (Consent Mod Only) */}
+      {showCustomModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9998, padding: 16 }}>
+          <div className="glass-card" style={{ background: 'rgba(13, 13, 18, 0.96)', border: `1px solid ${colors.border}`, borderRadius: 16, padding: '32px', width: '100%', maxWidth: 500, boxShadow: '0 20px 60px rgba(0,0,0,0.7)', position: 'relative' }}>
+            
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: colors.text, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>🎨</span> Customize Consent Mod
+                </div>
+                <div style={{ fontSize: 13, color: colors.textDim, marginTop: 4 }}>
+                  Change the file&apos;s Logo, Description, and Title (optional).
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCustomModal(false)}
+                style={{ background: 'transparent', border: 'none', color: colors.textDim, fontSize: 18, cursor: 'pointer', padding: 4 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Form Fields */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
+              {/* Logo / Icon */}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                  Mod Logo / Icon (Optional)
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 56, height: 56, borderRadius: 10, border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                    {customLogoPreview ? (
+                      <img src={customLogoPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span style={{ fontSize: 24, opacity: 0.5 }}>🖼️</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: `1px solid ${colors.border}`, color: colors.text, fontSize: 12, fontWeight: 600, cursor: 'pointer', width: 'fit-content' }}>
+                      <span>📁</span> Choose Image
+                      <input type="file" accept="image/*" onChange={handleLogoChange} style={{ display: 'none' }} />
+                    </label>
+                    {customLogoPreview && (
+                      <button
+                        onClick={handleRemoveLogo}
+                        style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: 11, cursor: 'pointer', textAlign: 'left', padding: 0 }}
+                      >
+                        ✕ Remove image
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Title / Name */}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                  Mod Title / Name (Optional)
+                </div>
+                <input
+                  type="text"
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                  placeholder="e.g. PerformanceBoost, FPSPlus, VoiceChat"
+                  style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none' }}
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: colors.textDim, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                  Mod Description (Optional)
+                </div>
+                <textarea
+                  value={customDescription}
+                  onChange={(e) => setCustomDescription(e.target.value)}
+                  placeholder="e.g. Boosts in-game FPS, reduces memory usage and optimizes chunk rendering."
+                  rows={3}
+                  style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}`, borderRadius: 8, padding: '10px 14px', color: colors.text, fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, paddingTop: 16, borderTop: `1px solid ${colors.border}` }}>
+              <button
+                onClick={() => setShowCustomModal(false)}
+                className="btn-smooth"
+                style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.textDim, padding: '9px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowCustomModal(false);
+                  handleDownload('consentmod', {
+                    title: customTitle.trim(),
+                    description: customDescription.trim(),
+                    logo: customLogo,
+                  });
+                }}
+                className="btn-smooth"
+                style={{ background: colors.green, color: '#000', border: 'none', padding: '9px 22px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <span>↓</span> Continue Download
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {downloading && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
