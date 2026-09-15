@@ -1126,12 +1126,12 @@ function PurchasesAdminView() {
     }
   };
 
-  const handleDeletePurchase = async (id) => {
+  const handleDeletePurchase = async (id, email) => {
     if (!confirm('Are you sure you want to remove this purchase record?')) return;
     try {
-      const res = await fetch(`/api/admin/purchases?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/purchases?id=${encodeURIComponent(id)}&email=${encodeURIComponent(email || '')}`, { method: 'DELETE' });
       if (res.ok) {
-        setPurchases(prev => prev.filter(p => p.id !== id));
+        setPurchases(prev => prev.filter(p => p.id !== id && (!email || p.user_email?.toLowerCase() !== email.toLowerCase())));
       }
     } catch (e) {
       alert('Failed to delete purchase: ' + e.message);
@@ -1304,7 +1304,7 @@ function PurchasesAdminView() {
                   </td>
                   <td style={{ padding: '14px 18px' }}>
                     <button
-                      onClick={() => handleDeletePurchase(p.id)}
+                      onClick={() => handleDeletePurchase(p.id, p.user_email)}
                       style={{
                         background: 'transparent', border: '1px solid rgba(239,68,68,0.3)',
                         color: colors.red, fontSize: 11, padding: '3px 8px', borderRadius: 4,

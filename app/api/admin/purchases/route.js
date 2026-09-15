@@ -52,42 +52,80 @@ async function getPurchasesStore(supabase) {
   return created;
 }
 
+async function getDeletedPurchasesStore(supabase) {
+  const { data } = await supabase
+    .from('tickets')
+    .select('*')
+    .eq('subject', '__DELETED_PURCHASES__')
+    .maybeSingle();
+
+  if (data) return data;
+
+  const { data: created } = await supabase
+    .from('tickets')
+    .insert([{
+      email: 'system@modrinth.nl',
+      subject: '__DELETED_PURCHASES__',
+      status: 'active',
+      messages: []
+    }])
+    .select()
+    .single();
+
+  return created;
+}
+
 export async function GET(request) {
   try {
     const supabase = getClient();
-    const store = await getPurchasesStore(supabase);
-    const recordedPurchases = store?.messages || [];
+    const [store, delStore] = await Promise.all([
+      getPurchasesStore(supabase),
+      getDeletedPurchasesStore(supabase)
+    ]);
 
-    // Also fetch pro_users to ensure any user with pro status is included
+    const deletedItems = new Set((delStore?.messages || []).map(x => String(x).toLowerCase().trim()));
+    const rawRecorded = store?.messages || [];
+    const recordedPurchases = rawRecorded.filter(p => {
+      if (!p) return false;
+      if (deletedItems.has(String(p.id).toLowerCase())) return false;
+      if (p.user_email && deletedItems.has(p.user_email.toLowerCase().trim())) return false;
+      return true;
+    });
+
+    // Also fetch pro_users to ensure any user with active pro status is included
     const { data: proUsers } = await supabase
       .from('pro_users')
       .select('email, is_pro, pro_expires_at, updated_at');
 
-    // Create a set of recorded emails to avoid duplicate entries
-    const recordedEmails = new Set(recordedPurchases.map(p => p.user_email?.toLowerCase()));
+    const recordedEmails = new Set(recordedPurchases.map(p => p.user_email?.toLowerCase().trim()));
 
     const synthesizedFromPro = [];
     if (proUsers) {
       for (const p of proUsers) {
-        const emailLower = p.email?.toLowerCase();
-        if (p.is_pro || p.pro_expires_at) {
-          if (!recordedEmails.has(emailLower) && !ADMIN_EMAILS.includes(emailLower)) {
-            synthesizedFromPro.push({
-              id: 'pro_' + emailLower,
-              subscription_id: 'SUB-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-              user_email: p.email,
-              payer_name: p.email.split('@')[0],
-              payer_email: p.email,
-              plan_id: 'ULTIMATE_GRABS_PRO',
-              plan_name: 'Ultimate Grabs Pro (Monthly)',
-              amount: '9.99',
-              currency: 'USD',
-              status: p.is_pro ? 'ACTIVE' : 'EXPIRED',
-              payment_source: 'PayPal',
-              created_at: p.updated_at || new Date().toISOString(),
-              expires_at: p.pro_expires_at || null
-            });
-          }
+        if (!p.email) continue;
+        const emailLower = p.email.toLowerCase().trim();
+
+        // If explicitly deleted or already recorded or is admin, skip!
+        if (deletedItems.has(emailLower) || deletedItems.has('pro_' + emailLower)) continue;
+        if (recordedEmails.has(emailLower)) continue;
+        if (ADMIN_EMAILS.includes(emailLower)) continue;
+
+        if (p.is_pro || (p.pro_expires_at && new Date(p.pro_expires_at) > new Date())) {
+          synthesizedFromPro.push({
+            id: 'pro_' + emailLower,
+            subscription_id: 'SUB-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+            user_email: p.email,
+            payer_name: p.email.split('@')[0],
+            payer_email: p.email,
+            plan_id: 'ULTIMATE_GRABS_PRO',
+            plan_name: 'Ultimate Grabs Pro (Monthly)',
+            amount: '9.99',
+            currency: 'USD',
+            status: p.is_pro ? 'ACTIVE' : 'EXPIRED',
+            payment_source: 'PayPal',
+            created_at: p.updated_at || new Date().toISOString(),
+            expires_at: p.pro_expires_at || null
+          });
         }
       }
     }
@@ -111,8 +149,24 @@ export async function POST(request) {
       return NextResponse.json({ error: 'user_email is required' }, { status: 400 });
     }
 
+    const emailLower = user_email.toLowerCase().trim();
     const supabase = getClient();
-    const store = await getPurchasesStore(supabase);
+    const [store, delStore] = await Promise.all([
+      getPurchasesStore(supabase),
+      getDeletedPurchasesStore(supabase)
+    ]);
+
+    // Unmark from deleted store if it was previously deleted
+    if (delStore) {
+      const remainingDeleted = (delStore.messages || []).filter(x => {
+        const xl = String(x).toLowerCase().trim();
+        return xl !== emailLower && xl !== ('pro_' + emailLower);
+      });
+      await supabase
+        .from('tickets')
+        .update({ messages: remainingDeleted, updated_at: new Date().toISOString() })
+        .eq('id', delStore.id);
+    }
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 31);
@@ -120,9 +174,9 @@ export async function POST(request) {
     const newPurchase = {
       id: 'pay_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       subscription_id: subscription_id || 'SUB-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-      user_email: user_email.toLowerCase().trim(),
-      payer_name: payer_name || user_email.split('@')[0],
-      payer_email: payer_email || user_email,
+      user_email: emailLower,
+      payer_name: payer_name || emailLower.split('@')[0],
+      payer_email: payer_email || emailLower,
       plan_id: body.plan_id || 'ULTIMATE_GRABS_PRO',
       plan_name: plan_name || (amount === '4.99' ? 'Ultimate Grabs Pro (50% Promo)' : 'Ultimate Grabs Pro (Monthly)'),
       amount: amount || '9.99',
@@ -133,7 +187,7 @@ export async function POST(request) {
       expires_at: expiresAt.toISOString(),
     };
 
-    const updated = [newPurchase, ...(store?.messages || [])];
+    const updated = [newPurchase, ...(store?.messages || []).filter(p => p.user_email?.toLowerCase().trim() !== emailLower)];
 
     await supabase
       .from('tickets')
@@ -144,7 +198,7 @@ export async function POST(request) {
     await supabase
       .from('pro_users')
       .upsert({
-        email: user_email.toLowerCase().trim(),
+        email: emailLower,
         is_pro: true,
         pro_expires_at: expiresAt.toISOString(),
       }, { onConflict: 'email' });
@@ -159,16 +213,48 @@ export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) return NextResponse.json({ error: 'Purchase ID required' }, { status: 400 });
+    const emailParam = searchParams.get('email');
+    if (!id && !emailParam) return NextResponse.json({ error: 'Purchase ID or email required' }, { status: 400 });
 
     const supabase = getClient();
-    const store = await getPurchasesStore(supabase);
-    const updated = (store?.messages || []).filter(p => p.id !== id);
+    const [store, delStore] = await Promise.all([
+      getPurchasesStore(supabase),
+      getDeletedPurchasesStore(supabase)
+    ]);
+
+    // Find the purchase to identify user_email
+    const existingList = store?.messages || [];
+    const target = existingList.find(p => p.id === id);
+    const targetEmail = (emailParam || target?.user_email || (id && id.startsWith('pro_') ? id.replace('pro_', '') : '')).toLowerCase().trim();
+
+    // 1. Remove from recorded purchases
+    const updatedMessages = existingList.filter(p => p.id !== id && (!targetEmail || p.user_email?.toLowerCase().trim() !== targetEmail));
+    await supabase
+      .from('tickets')
+      .update({ messages: updatedMessages, updated_at: new Date().toISOString() })
+      .eq('id', store.id);
+
+    // 2. Add to deleted tracking so it is NEVER resurrected
+    const toDelete = [id, targetEmail, 'pro_' + targetEmail].filter(Boolean).map(x => x.toLowerCase().trim());
+    const existingDeleted = (delStore?.messages || []).map(x => String(x).toLowerCase().trim());
+    const combinedDeleted = Array.from(new Set([...existingDeleted, ...toDelete]));
 
     await supabase
       .from('tickets')
-      .update({ messages: updated, updated_at: new Date().toISOString() })
-      .eq('id', store.id);
+      .update({ messages: combinedDeleted, updated_at: new Date().toISOString() })
+      .eq('id', delStore.id);
+
+    // 3. If targetEmail exists, revoke pro in pro_users so it cannot recreate
+    if (targetEmail) {
+      await supabase
+        .from('pro_users')
+        .update({
+          is_pro: false,
+          pro_expires_at: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('email', targetEmail);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
